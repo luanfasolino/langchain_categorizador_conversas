@@ -134,6 +134,12 @@ database/
 database/cache/
 *.pkl
 
+# Configuration and personal folders
+.claude/
+.cursor/
+.taskmaster/
+docs/
+
 # Editor directories and files
 .idea/
 .vscode/
