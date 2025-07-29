@@ -12,6 +12,7 @@ build/
 develop-eggs/
 dist/
 downloads/
+database/
 eggs/
 .eggs/
 lib/
@@ -129,6 +130,7 @@ dmypy.json
 .pyre/
 
 # Specific to this project
+database/
 database/cache/
 *.pkl
 
