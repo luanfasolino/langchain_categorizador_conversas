@@ -1,0 +1,8 @@
+langchain>=0.1.5
+langchain-google-genai>=0.0.6
+pandas==2.2.1
+python-dotenv==1.0.1
+requests==2.31.0
+openpyxl==3.1.2  # Para ler arquivos Excel
+google-generativeai>=0.3.1 
+tqdm>=4.66.1  # Para mostrar barras de progresso 
