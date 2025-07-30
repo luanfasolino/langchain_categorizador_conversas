@@ -2,15 +2,15 @@
 Tests for PerformanceMonitor module
 """
 
-import pytest
-import pandas as pd
-import tempfile
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
+import pytest
+import pandas as pd
+import tempfile
 from discovery.performance_monitor import (
     PerformanceMonitor,
     CostMetrics,
@@ -18,7 +18,7 @@ from discovery.performance_monitor import (
     AccuracyMetrics,
     ValidationReport,
     create_performance_monitor,
-    validate_opçao_d_compliance
+    validate_opçao_d_compliance,
 )
 
 
@@ -35,33 +35,35 @@ class TestPerformanceMonitor:
             discovery_sample_size=150,
             categories_discovered=5,
             total_processing_time=300.0,  # 5 minutes
-            discovery_time=60.0,          # 1 minute
-            application_time=240.0,       # 4 minutes
+            discovery_time=60.0,  # 1 minute
+            application_time=240.0,  # 4 minutes
             total_cost_usd=1.50,
             cost_per_1k_tickets=1.50,
             avg_confidence=0.89,
             classification_rate=0.94,
-            meets_cost_target=False,       # Exceeds 0.20 target
-            meets_confidence_target=True   # Above 0.85 target
+            meets_cost_target=False,  # Exceeds 0.20 target
+            meets_confidence_target=True,  # Above 0.85 target
         )
 
     @pytest.fixture
     def sample_classification_results(self):
         """Create sample classification results DataFrame"""
-        return pd.DataFrame({
-            'ticket_id': ['T001', 'T002', 'T003', 'T004', 'T005'],
-            'category_ids': ['[1]', '[2]', '[1,3]', '[2]', '[1]'],
-            'category_names': [
-                'Problemas de Pagamento',
-                'Alterações de Reserva',
-                'Problemas de Pagamento,Problemas Técnicos',
-                'Alterações de Reserva',
-                'Problemas de Pagamento'
-            ],
-            'confidence': [0.95, 0.87, 0.82, 0.91, 0.93],
-            'processing_time': [1.2, 1.5, 2.1, 1.3, 1.1],
-            'tokens_used': [150, 180, 220, 160, 140]
-        })
+        return pd.DataFrame(
+            {
+                "ticket_id": ["T001", "T002", "T003", "T004", "T005"],
+                "category_ids": ["[1]", "[2]", "[1,3]", "[2]", "[1]"],
+                "category_names": [
+                    "Problemas de Pagamento",
+                    "Alterações de Reserva",
+                    "Problemas de Pagamento,Problemas Técnicos",
+                    "Alterações de Reserva",
+                    "Problemas de Pagamento",
+                ],
+                "confidence": [0.95, 0.87, 0.82, 0.91, 0.93],
+                "processing_time": [1.2, 1.5, 2.1, 1.3, 1.1],
+                "tokens_used": [150, 180, 220, 160, 140],
+            }
+        )
 
     @pytest.fixture
     def sample_categories(self):
@@ -71,18 +73,18 @@ class TestPerformanceMonitor:
                 {
                     "id": 1,
                     "technical_name": "payment_issues",
-                    "display_name": "Problemas de Pagamento"
+                    "display_name": "Problemas de Pagamento",
                 },
                 {
                     "id": 2,
                     "technical_name": "booking_changes",
-                    "display_name": "Alterações de Reserva"
+                    "display_name": "Alterações de Reserva",
                 },
                 {
                     "id": 3,
                     "technical_name": "technical_issues",
-                    "display_name": "Problemas Técnicos"
-                }
+                    "display_name": "Problemas Técnicos",
+                },
             ]
         }
 
@@ -101,7 +103,7 @@ class TestPerformanceMonitor:
             discovery_cost=0.50,
             application_cost=2.00,
             target_cost=0.20,
-            meets_target=False
+            meets_target=False,
         )
 
         assert cost_metrics.total_cost_usd == 2.50
@@ -115,7 +117,7 @@ class TestPerformanceMonitor:
             discovery_time=60.0,
             application_time=240.0,
             throughput_tickets_per_second=3.33,
-            avg_processing_time_per_ticket=0.30
+            avg_processing_time_per_ticket=0.30,
         )
 
         assert perf_metrics.total_processing_time == 300.0
@@ -129,7 +131,7 @@ class TestPerformanceMonitor:
             classification_rate=0.94,
             high_confidence_rate=0.80,
             low_confidence_rate=0.05,
-            meets_confidence_target=True
+            meets_confidence_target=True,
         )
 
         assert accuracy_metrics.avg_confidence == 0.89
@@ -146,7 +148,7 @@ class TestPerformanceMonitor:
             performance_metrics=perf_metrics,
             accuracy_metrics=accuracy_metrics,
             overall_compliance=False,
-            recommendations=["Optimize costs", "Maintain quality"]
+            recommendations=["Optimize costs", "Maintain quality"],
         )
 
         assert not report.overall_compliance
@@ -155,7 +157,7 @@ class TestPerformanceMonitor:
     def test_monitor_initialization(self, mock_monitor):
         """Test PerformanceMonitor initialization"""
         assert isinstance(mock_monitor.database_dir, Path)
-        assert hasattr(mock_monitor, 'logger')
+        assert hasattr(mock_monitor, "logger")
 
     def test_analyze_cost_metrics(self, mock_monitor, sample_orchestration_metrics):
         """Test cost metrics analysis"""
@@ -184,9 +186,7 @@ class TestPerformanceMonitor:
         assert abs(perf_metrics.throughput_tickets_per_second - 3.33) < 0.01
         assert perf_metrics.avg_processing_time_per_ticket == 0.30
 
-    def test_analyze_accuracy_metrics(
-        self, mock_monitor, sample_orchestration_metrics
-    ):
+    def test_analyze_accuracy_metrics(self, mock_monitor, sample_orchestration_metrics):
         """Test accuracy metrics analysis"""
         accuracy_metrics = mock_monitor.analyze_accuracy_metrics(
             sample_orchestration_metrics
@@ -239,14 +239,17 @@ class TestPerformanceMonitor:
         assert cost_rec or conf_rec
 
     def test_create_validation_report(
-        self, mock_monitor, sample_orchestration_metrics, sample_classification_results,
-        sample_categories
+        self,
+        mock_monitor,
+        sample_orchestration_metrics,
+        sample_classification_results,
+        sample_categories,
     ):
         """Test complete validation report creation"""
         report = mock_monitor.create_validation_report(
             sample_orchestration_metrics,
             sample_classification_results,
-            sample_categories
+            sample_categories,
         )
 
         assert isinstance(report, ValidationReport)
@@ -256,14 +259,17 @@ class TestPerformanceMonitor:
         assert isinstance(report.recommendations, list)
 
     def test_save_validation_report(
-        self, mock_monitor, sample_orchestration_metrics, sample_classification_results,
-        sample_categories
+        self,
+        mock_monitor,
+        sample_orchestration_metrics,
+        sample_classification_results,
+        sample_categories,
     ):
         """Test saving validation report to file"""
         report = mock_monitor.create_validation_report(
             sample_orchestration_metrics,
             sample_classification_results,
-            sample_categories
+            sample_categories,
         )
 
         output_path = mock_monitor.database_dir / "test_validation_report.json"
@@ -273,7 +279,8 @@ class TestPerformanceMonitor:
 
         # Verify content
         import json
-        with open(output_path, 'r', encoding='utf-8') as f:
+
+        with open(output_path, "r", encoding="utf-8") as f:
             saved_data = json.load(f)
 
         assert "cost_metrics" in saved_data
@@ -292,14 +299,14 @@ class TestPerformanceMonitor:
                 "discovery_cost": 0.50,
                 "application_cost": 1.00,
                 "target_cost": 0.20,
-                "meets_target": False
+                "meets_target": False,
             },
             "performance_metrics": {
                 "total_processing_time": 300.0,
                 "discovery_time": 60.0,
                 "application_time": 240.0,
                 "throughput_tickets_per_second": 3.33,
-                "avg_processing_time_per_ticket": 0.30
+                "avg_processing_time_per_ticket": 0.30,
             },
             "accuracy_metrics": {
                 "avg_confidence": 0.89,
@@ -307,17 +314,18 @@ class TestPerformanceMonitor:
                 "classification_rate": 0.94,
                 "high_confidence_rate": 0.80,
                 "low_confidence_rate": 0.05,
-                "meets_confidence_target": True
+                "meets_confidence_target": True,
             },
             "overall_compliance": False,
             "recommendations": ["Optimize costs"],
-            "timestamp": "2024-01-01T10:00:00"
+            "timestamp": "2024-01-01T10:00:00",
         }
 
         # Save test data
         test_path = mock_monitor.database_dir / "test_load_report.json"
         import json
-        with open(test_path, 'w', encoding='utf-8') as f:
+
+        with open(test_path, "w", encoding="utf-8") as f:
             json.dump(test_data, f, indent=2)
 
         # Load and verify
@@ -351,7 +359,7 @@ class TestPerformanceMonitor:
     ):
         """Test confidence distribution analysis"""
         conf_analysis = mock_monitor._analyze_confidence_distribution(
-            sample_classification_results['confidence']
+            sample_classification_results["confidence"]
         )
 
         assert "mean" in conf_analysis
@@ -381,9 +389,9 @@ class TestPerformanceMonitor:
         self, mock_monitor, sample_classification_results
     ):
         """Test processing time analysis"""
-        if 'processing_time' in sample_classification_results.columns:
+        if "processing_time" in sample_classification_results.columns:
             time_analysis = mock_monitor._analyze_processing_times(
-                sample_classification_results['processing_time']
+                sample_classification_results["processing_time"]
             )
 
             assert "mean_time" in time_analysis
@@ -393,9 +401,9 @@ class TestPerformanceMonitor:
 
     def test_token_usage_analysis(self, mock_monitor, sample_classification_results):
         """Test token usage analysis"""
-        if 'tokens_used' in sample_classification_results.columns:
+        if "tokens_used" in sample_classification_results.columns:
             token_analysis = mock_monitor._analyze_token_usage(
-                sample_classification_results['tokens_used']
+                sample_classification_results["tokens_used"]
             )
 
             assert "total_tokens" in token_analysis
@@ -404,14 +412,17 @@ class TestPerformanceMonitor:
             assert all(val >= 0 for val in token_analysis.values())
 
     def test_export_metrics_csv(
-        self, mock_monitor, sample_orchestration_metrics, sample_classification_results,
-        sample_categories
+        self,
+        mock_monitor,
+        sample_orchestration_metrics,
+        sample_classification_results,
+        sample_categories,
     ):
         """Test exporting metrics to CSV format"""
         report = mock_monitor.create_validation_report(
             sample_orchestration_metrics,
             sample_classification_results,
-            sample_categories
+            sample_categories,
         )
 
         csv_path = mock_monitor.database_dir / "metrics_export.csv"
@@ -421,6 +432,7 @@ class TestPerformanceMonitor:
 
         # Verify CSV content
         import pandas as pd
+
         df = pd.read_csv(csv_path)
         assert not df.empty
         assert len(df.columns) > 0

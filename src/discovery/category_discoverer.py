@@ -259,7 +259,9 @@ Retorne EXATAMENTE no formato JSON especificado:
                     self._save_categories_json(cached_result, output_path)
                 return cached_result
 
-        self.logger.info(f"Starting category discovery on {len(tickets_df)} sample tickets")
+        self.logger.info(
+            f"Starting category discovery on {len(tickets_df)} sample tickets"
+        )
 
         try:
             # Phase 1: MAP - Analyze patterns in chunks
@@ -325,15 +327,21 @@ Retorne EXATAMENTE no formato JSON especificado:
                 try:
                     analysis = future.result()
                     pattern_analyses.append(analysis)
-                    self.logger.debug(f"Completed pattern analysis for chunk {chunk_idx}")
+                    self.logger.debug(
+                        f"Completed pattern analysis for chunk {chunk_idx}"
+                    )
                 except Exception as e:
-                    self.logger.error(f"Pattern analysis failed for chunk {chunk_idx}: {str(e)}")
+                    self.logger.error(
+                        f"Pattern analysis failed for chunk {chunk_idx}: {str(e)}"
+                    )
                     continue
 
         if not pattern_analyses:
             raise RuntimeError("No successful pattern analyses completed")
 
-        self.logger.info(f"MAP phase completed: {len(pattern_analyses)} pattern analyses")
+        self.logger.info(
+            f"MAP phase completed: {len(pattern_analyses)} pattern analyses"
+        )
         return pattern_analyses
 
     def _combine_patterns(self, pattern_analyses: List[str]) -> str:
@@ -396,7 +404,9 @@ Retorne EXATAMENTE no formato JSON especificado:
                 categories = json.loads(categories_str)
                 return categories
             except (json.JSONDecodeError, ValueError) as e:
-                raise RuntimeError("Could not parse categories response as valid JSON") from e
+                raise RuntimeError(
+                    "Could not parse categories response as valid JSON"
+                ) from e
         except Exception as e:
             self.logger.error(f"Category extraction failed: {str(e)}")
             raise
@@ -505,15 +515,21 @@ Retorne EXATAMENTE no formato JSON especificado:
 
         # Enhance with statistics
         categories["discovery_stats"]["total_tickets_analyzed"] = len(tickets_df)
-        categories["discovery_stats"]["unique_tickets"] = tickets_df["ticket_id"].nunique()
+        categories["discovery_stats"]["unique_tickets"] = tickets_df[
+            "ticket_id"
+        ].nunique()
         categories["discovery_stats"]["categories_created"] = len(category_list)
 
         # Add quality metrics
         avg_keywords = np.mean([len(cat.get("keywords", [])) for cat in category_list])
         has_subcategories = sum(1 for cat in category_list if cat.get("subcategories"))
 
-        categories["discovery_stats"]["avg_keywords_per_category"] = round(avg_keywords, 1)
-        categories["discovery_stats"]["categories_with_subcategories"] = has_subcategories
+        categories["discovery_stats"]["avg_keywords_per_category"] = round(
+            avg_keywords, 1
+        )
+        categories["discovery_stats"][
+            "categories_with_subcategories"
+        ] = has_subcategories
         categories["discovery_stats"]["confidence_level"] = min(
             0.95, 0.6 + (len(category_list) * 0.02)
         )
@@ -579,7 +595,9 @@ Retorne EXATAMENTE no formato JSON especificado:
             return categories
 
         except Exception as e:
-            self.logger.error(f"Failed to load categories from {categories_path}: {str(e)}")
+            self.logger.error(
+                f"Failed to load categories from {categories_path}: {str(e)}"
+            )
             raise
 
     def get_discovery_stats(self, categories: Dict[str, Any]) -> Dict[str, Any]:
@@ -602,7 +620,9 @@ Retorne EXATAMENTE no formato JSON especificado:
             "categories_with_subcategories": sum(
                 1 for cat in category_list if cat.get("subcategories")
             ),
-            "total_subcategories": sum(len(cat.get("subcategories", [])) for cat in category_list),
+            "total_subcategories": sum(
+                len(cat.get("subcategories", [])) for cat in category_list
+            ),
             "avg_keywords_per_category": np.mean(
                 [len(cat.get("keywords", [])) for cat in category_list]
             ),
@@ -616,7 +636,9 @@ Retorne EXATAMENTE no formato JSON especificado:
         for cat in category_list:
             complexity = len(cat.get("subcategories", []))
             complexity_level = (
-                "simple" if complexity == 0 else "complex" if complexity > 2 else "medium"
+                "simple"
+                if complexity == 0
+                else "complex" if complexity > 2 else "medium"
             )
             stats["categories_by_complexity"][complexity_level] = (
                 stats["categories_by_complexity"].get(complexity_level, 0) + 1
@@ -626,7 +648,9 @@ Retorne EXATAMENTE no formato JSON especificado:
 
 
 # Utility functions for category operations
-def merge_categories(categories1: Dict[str, Any], categories2: Dict[str, Any]) -> Dict[str, Any]:
+def merge_categories(
+    categories1: Dict[str, Any], categories2: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Merge two category dictionaries.
 
@@ -665,7 +689,10 @@ def validate_categories_schema(categories: Dict[str, Any]) -> bool:
 
     # Validate categories structure
     for cat in categories.get("categories", []):
-        if not all(key in cat for key in ["id", "technical_name", "display_name", "description"]):
+        if not all(
+            key in cat
+            for key in ["id", "technical_name", "display_name", "description"]
+        ):
             return False
 
     return True

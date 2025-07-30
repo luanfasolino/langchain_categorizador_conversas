@@ -1,6 +1,6 @@
 # Makefile para automação de tarefas de qualidade
 
-.PHONY: install test lint format typecheck qa clean help
+.PHONY: install test lint format format-check typecheck qa qa-strict qa-fix qa-strict-fix clean help run
 
 help:  ## Mostra esta ajuda
 	@echo "Comandos disponíveis:"
@@ -27,6 +27,8 @@ typecheck:  ## Verifica tipos
 
 qa: lint format-check test  ## Executa todas as verificações de qualidade
 qa-strict: lint format-check typecheck test  ## Executa QA incluindo verificação de tipos
+qa-fix: lint format test  ## Formata automaticamente e executa QA
+qa-strict-fix: lint format typecheck test  ## Formata automaticamente e executa QA completo
 
 clean:  ## Remove arquivos temporários
 	find . -type f -name "*.pyc" -delete

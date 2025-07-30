@@ -24,7 +24,9 @@ class TicketCategorizer(BaseProcessor):
         max_workers: int = None,
         use_cache: bool = True,
     ):
-        super().__init__(api_key, database_dir, max_workers=max_workers, use_cache=use_cache)
+        super().__init__(
+            api_key, database_dir, max_workers=max_workers, use_cache=use_cache
+        )
         # Configuração otimizada do Gemini 2.5 Flash conforme Task 1.3
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
@@ -145,7 +147,9 @@ class TicketCategorizer(BaseProcessor):
         Cria chunks otimizados usando melhores práticas Context7 + Task 1.1.
         Usa RecursiveCharacterTextSplitter com tiktoken para precisão máxima.
         """
-        print("🔧 Criando chunks com RecursiveCharacterTextSplitter + tiktoken (Context7)...")
+        print(
+            "🔧 Criando chunks com RecursiveCharacterTextSplitter + tiktoken (Context7)..."
+        )
 
         # Cria documento inicial
         initial_doc = Document(page_content=full_text)
@@ -198,14 +202,18 @@ class TicketCategorizer(BaseProcessor):
 
         print("🚀 Configurando executor paralelo:")
         print(f"   • Workers: {executor_config['max_workers']}")
-        print(f"   • CPUs disponíveis: {executor_config['performance_metrics']['cpu_count']}")
+        print(
+            f"   • CPUs disponíveis: {executor_config['performance_metrics']['cpu_count']}"
+        )
         print(
             f"   • Limite recomendado: {executor_config['performance_metrics']['recommended_workers']}"
         )
 
         return executor_config
 
-    def validate_model_response(self, response: str, expected_format: str = "json") -> dict:
+    def validate_model_response(
+        self, response: str, expected_format: str = "json"
+    ) -> dict:
         """
         Valida respostas do modelo Gemini 2.5 Flash.
         Implementa validação conforme Task 1.3.
@@ -229,14 +237,22 @@ class TicketCategorizer(BaseProcessor):
                 # Validações específicas para categorização
                 if "cat" in parsed_data and isinstance(parsed_data["cat"], list):
                     for item in parsed_data["cat"]:
-                        if not isinstance(item, dict) or "id" not in item or "cat" not in item:
+                        if (
+                            not isinstance(item, dict)
+                            or "id" not in item
+                            or "cat" not in item
+                        ):
                             validation_result["issues"].append(
                                 "Invalid item structure in cat array"
                             )
                         elif not isinstance(item["cat"], list):
-                            validation_result["issues"].append("Categories must be a list")
+                            validation_result["issues"].append(
+                                "Categories must be a list"
+                            )
                         elif len(item["cat"]) > 3:
-                            validation_result["issues"].append("More than 3 categories per ticket")
+                            validation_result["issues"].append(
+                                "More than 3 categories per ticket"
+                            )
                 else:
                     validation_result["issues"].append("Missing or invalid 'cat' field")
             else:
@@ -479,7 +495,8 @@ class TicketCategorizer(BaseProcessor):
         # Calcula métricas de performance em tempo real
         elapsed_time = time.time() - self.token_tracker["session_start_time"]
         total_tokens = (
-            self.token_tracker["total_input_tokens"] + self.token_tracker["total_output_tokens"]
+            self.token_tracker["total_input_tokens"]
+            + self.token_tracker["total_output_tokens"]
         )
 
         self.token_tracker["performance_metrics"]["tokens_per_second"] = (
@@ -497,7 +514,9 @@ class TicketCategorizer(BaseProcessor):
             "cumulative_cost": self.token_tracker["total_cost"],
         }
 
-    def generate_cost_projection(self, dataset_size: int, sample_tokens: int = None) -> dict:
+    def generate_cost_projection(
+        self, dataset_size: int, sample_tokens: int = None
+    ) -> dict:
         """
         Gera projeções de custo baseadas no uso atual ou tamanho de amostra.
         Implementa funcionalidade de budget monitoring da Task 1.5.
@@ -508,7 +527,8 @@ class TicketCategorizer(BaseProcessor):
         # Usa tokens já processados como base ou valor fornecido
         if sample_tokens is None:
             processed_tokens = (
-                self.token_tracker["total_input_tokens"] + self.token_tracker["total_output_tokens"]
+                self.token_tracker["total_input_tokens"]
+                + self.token_tracker["total_output_tokens"]
             )
             if processed_tokens == 0:
                 return {"error": "Nenhum token processado para projeção"}
@@ -521,7 +541,9 @@ class TicketCategorizer(BaseProcessor):
 
         if current_cost > 0:
             cost_per_token = current_cost / processed_tokens
-            projected_total_tokens = processed_tokens * (dataset_size / max(1, dataset_size))
+            projected_total_tokens = processed_tokens * (
+                dataset_size / max(1, dataset_size)
+            )
             projected_cost = cost_per_token * projected_total_tokens
         else:
             # Estimativa conservadora se não há dados
@@ -559,7 +581,8 @@ class TicketCategorizer(BaseProcessor):
 
         elapsed_time = time.time() - self.token_tracker["session_start_time"]
         total_tokens = (
-            self.token_tracker["total_input_tokens"] + self.token_tracker["total_output_tokens"]
+            self.token_tracker["total_input_tokens"]
+            + self.token_tracker["total_output_tokens"]
         )
 
         # Atualiza métricas finais
@@ -582,7 +605,8 @@ class TicketCategorizer(BaseProcessor):
                 ),
                 "cost_efficiency": {
                     "cost_per_1k_tokens": round(
-                        (self.token_tracker["total_cost"] / max(total_tokens, 1)) * 1000,
+                        (self.token_tracker["total_cost"] / max(total_tokens, 1))
+                        * 1000,
                         4,
                     ),
                     "input_output_ratio": round(
@@ -593,10 +617,16 @@ class TicketCategorizer(BaseProcessor):
                 },
             },
             "cost_analysis": {
-                "input_cost": round((self.token_tracker["total_input_tokens"] / 1000) * 0.125, 4),
-                "output_cost": round((self.token_tracker["total_output_tokens"] / 1000) * 0.375, 4),
+                "input_cost": round(
+                    (self.token_tracker["total_input_tokens"] / 1000) * 0.125, 4
+                ),
+                "output_cost": round(
+                    (self.token_tracker["total_output_tokens"] / 1000) * 0.375, 4
+                ),
                 "cost_distribution": {
-                    "map_phase": round(self.token_tracker["phase_breakdown"]["map"]["cost"], 4),
+                    "map_phase": round(
+                        self.token_tracker["phase_breakdown"]["map"]["cost"], 4
+                    ),
                     "combine_phase": round(
                         self.token_tracker["phase_breakdown"]["combine"]["cost"], 4
                     ),
@@ -642,7 +672,9 @@ class TicketCategorizer(BaseProcessor):
         categorize_cost = phases["categorize"]["cost"]
 
         if map_cost > combine_cost + categorize_cost:
-            recommendations.append("🔄 Fase MAP dominando custos - otimize tamanho de chunks")
+            recommendations.append(
+                "🔄 Fase MAP dominando custos - otimize tamanho de chunks"
+            )
 
         if categorize_cost > map_cost + combine_cost:
             recommendations.append(
@@ -650,7 +682,9 @@ class TicketCategorizer(BaseProcessor):
             )
 
         if not recommendations:
-            recommendations.append("✅ Uso de tokens otimizado - padrão eficiente detectado")
+            recommendations.append(
+                "✅ Uso de tokens otimizado - padrão eficiente detectado"
+            )
 
         return recommendations
 
@@ -667,7 +701,9 @@ class TicketCategorizer(BaseProcessor):
         initial_projection = self.generate_cost_projection(len(tickets))
         if "error" not in initial_projection:
             print(f"💰 Projeção de custos: ${initial_projection['projected_cost']:.2f}")
-            print(f"   • Tokens estimados: {initial_projection['projected_total_tokens']:,}")
+            print(
+                f"   • Tokens estimados: {initial_projection['projected_total_tokens']:,}"
+            )
             if initial_projection["budget_alerts"]:
                 for alert in initial_projection["budget_alerts"]:
                     print(f"   {alert}")
@@ -747,10 +783,13 @@ class TicketCategorizer(BaseProcessor):
                 }
 
         # Processa os chunks em paralelo
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_workers
+        ) as executor:
             # Submete todos os chunks para processamento
             future_to_chunk = {
-                executor.submit(process_chunk, i, doc): (i, doc) for i, doc in enumerate(docs, 1)
+                executor.submit(process_chunk, i, doc): (i, doc)
+                for i, doc in enumerate(docs, 1)
             }
 
             # Coleta os resultados com monitoramento de performance Task 1.2
@@ -797,7 +836,9 @@ class TicketCategorizer(BaseProcessor):
 
             # Estatísticas de performance
             avg_processing_time = (
-                total_processing_time / successful_chunks if successful_chunks > 0 else 0
+                total_processing_time / successful_chunks
+                if successful_chunks > 0
+                else 0
             )
             print("\n📊 Estatísticas de Performance MAP:")
             print(f"   • Chunks processados: {successful_chunks}/{len(docs)}")
@@ -871,7 +912,8 @@ class TicketCategorizer(BaseProcessor):
                 def _process_batch_internal():
                     # Construa o texto para este batch
                     batch_text = "\n\n".join(
-                        f"Ticket {ticket['ticket_id']}:\n{ticket['text']}" for ticket in batch
+                        f"Ticket {ticket['ticket_id']}:\n{ticket['text']}"
+                        for ticket in batch
                     )
 
                     categorize_input = {
@@ -905,7 +947,10 @@ class TicketCategorizer(BaseProcessor):
                     json_str = self.extract_json(response)
                     batch_results = json.loads(json_str)
 
-                    if not isinstance(batch_results, dict) or "cat" not in batch_results:
+                    if (
+                        not isinstance(batch_results, dict)
+                        or "cat" not in batch_results
+                    ):
                         return {
                             "results": [],
                             "input_tokens": batch_input_tokens,
@@ -918,7 +963,11 @@ class TicketCategorizer(BaseProcessor):
                     # Valida e normaliza as categorias do batch
                     valid_batch_results = []
                     for item in batch_results["cat"]:
-                        if not isinstance(item, dict) or "id" not in item or "cat" not in item:
+                        if (
+                            not isinstance(item, dict)
+                            or "id" not in item
+                            or "cat" not in item
+                        ):
                             continue
                         if not isinstance(item["cat"], list):
                             continue
@@ -926,7 +975,9 @@ class TicketCategorizer(BaseProcessor):
                             {
                                 "ticket_id": item["id"],
                                 "categorias": [
-                                    cat.strip() for cat in item["cat"] if isinstance(cat, str)
+                                    cat.strip()
+                                    for cat in item["cat"]
+                                    if isinstance(cat, str)
                                 ][:3],
                             }
                         )
@@ -973,7 +1024,9 @@ class TicketCategorizer(BaseProcessor):
             total_batch_processing_time = 0
             successful_batches = 0
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.max_workers
+            ) as executor:
                 # Submete todos os batches para processamento
                 future_to_batch = {
                     executor.submit(process_batch, i, batch): (i, batch)
@@ -991,7 +1044,9 @@ class TicketCategorizer(BaseProcessor):
                         result = future.result()
                         if result["success"]:
                             all_categorization_results.extend(result["results"])
-                            total_batch_processing_time += result.get("processing_time", 0)
+                            total_batch_processing_time += result.get(
+                                "processing_time", 0
+                            )
                             successful_batches += 1
 
                             retry_info = (
@@ -1022,24 +1077,34 @@ class TicketCategorizer(BaseProcessor):
 
             # Estatísticas de performance dos batches
             avg_batch_time = (
-                total_batch_processing_time / successful_batches if successful_batches > 0 else 0
+                total_batch_processing_time / successful_batches
+                if successful_batches > 0
+                else 0
             )
             categorize_phase_data = self.token_tracker["phase_breakdown"]["categorize"]
 
             print("\n📊 Estatísticas de Performance CATEGORIZE:")
-            print(f"   • Batches processados: {successful_batches}/{len(ticket_batches)}")
+            print(
+                f"   • Batches processados: {successful_batches}/{len(ticket_batches)}"
+            )
             print(f"   • Tempo médio por batch: {avg_batch_time:.2f}s")
-            print(f"   • Tempo total de processamento: {total_batch_processing_time:.2f}s")
+            print(
+                f"   • Tempo total de processamento: {total_batch_processing_time:.2f}s"
+            )
             print(
                 f"   • Tokens CATEGORIZE - Input: {categorize_phase_data['input']:,} | Output: {categorize_phase_data['output']:,}"
             )
-            print(f"   • Custo da fase CATEGORIZE: ${categorize_phase_data['cost']:.4f}")
+            print(
+                f"   • Custo da fase CATEGORIZE: ${categorize_phase_data['cost']:.4f}"
+            )
 
             if not all_categorization_results:
                 print("\nAviso: Nenhuma categorização válida foi gerada!")
                 return None
 
-            print(f"\nResultados obtidos: {len(all_categorization_results)} tickets categorizados")
+            print(
+                f"\nResultados obtidos: {len(all_categorization_results)} tickets categorizados"
+            )
             print("Exemplo do primeiro resultado:", all_categorization_results[0])
 
             # Prepara os dados para o DataFrame expandido
@@ -1047,7 +1112,9 @@ class TicketCategorizer(BaseProcessor):
             for result in all_categorization_results:
                 ticket_id = result["ticket_id"]
                 for categoria in result["categorias"]:
-                    expanded_results.append({"ticket_id": ticket_id, "categoria": categoria})
+                    expanded_results.append(
+                        {"ticket_id": ticket_id, "categoria": categoria}
+                    )
 
             # Cria e salva o DataFrame expandido
             results_df = pd.DataFrame(expanded_results)
@@ -1072,7 +1139,9 @@ class TicketCategorizer(BaseProcessor):
             session_summary = comprehensive_report["session_summary"]
             print("💰 RESUMO FINAL:")
             print(f"   • Total Input Tokens: {session_summary['total_input_tokens']:,}")
-            print(f"   • Total Output Tokens: {session_summary['total_output_tokens']:,}")
+            print(
+                f"   • Total Output Tokens: {session_summary['total_output_tokens']:,}"
+            )
             print(f"   • Total Geral: {session_summary['total_tokens']:,}")
             print(f"   • Custo Total: ${session_summary['total_cost_usd']}")
             print(f"   • Duração: {session_summary['session_duration_seconds']:.1f}s")
@@ -1115,12 +1184,22 @@ class TicketCategorizer(BaseProcessor):
 
             print("\n=== 🔄 Estatísticas de Error Handling ===")
             print(f"Chunks processados com sucesso: {successful_chunks}/{len(docs)}")
-            print(f"Batches processados com sucesso: {successful_batches}/{len(ticket_batches)}")
-            print(f"Taxa de sucesso chunks: {(successful_chunks/len(docs)*100):.1f}%")
-            print(f"Taxa de sucesso batches: {(successful_batches/len(ticket_batches)*100):.1f}%")
+            print(
+                f"Batches processados com sucesso: {successful_batches}/{len(ticket_batches)}"
+            )
+            print(
+                f"Taxa de sucesso chunks: {(successful_chunks / len(docs) * 100):.1f}%"
+            )
+            print(
+                f"Taxa de sucesso batches: {(successful_batches / len(ticket_batches) * 100):.1f}%"
+            )
 
-            if successful_chunks < len(docs) or successful_batches < len(ticket_batches):
-                print("⚠️  Alguns itens falharam após múltiplas tentativas. Verifique logs de erro.")
+            if successful_chunks < len(docs) or successful_batches < len(
+                ticket_batches
+            ):
+                print(
+                    "⚠️  Alguns itens falharam após múltiplas tentativas. Verifique logs de erro."
+                )
 
             print("=" * 60)
 

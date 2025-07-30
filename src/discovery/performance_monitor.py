@@ -144,7 +144,9 @@ class PerformanceMonitor:
         }
 
         self.logger.info(f"Started monitoring session: {session_name}")
-        self.logger.info(f"Dataset: {dataset_info.get('total_tickets', 'unknown')} tickets")
+        self.logger.info(
+            f"Dataset: {dataset_info.get('total_tickets', 'unknown')} tickets"
+        )
 
     def record_phase_start(self, phase_name: str, phase_info: Dict[str, Any] = None):
         """Record the start of a processing phase."""
@@ -190,7 +192,9 @@ class PerformanceMonitor:
         self.current_session["phase_timings"][phase_name]["end_time"] = end_time
         self.current_session["phase_timings"][phase_name]["duration"] = duration
         self.current_session["phase_timings"][phase_name]["cost_usd"] = cost_usd
-        self.current_session["phase_timings"][phase_name]["metrics"] = additional_metrics
+        self.current_session["phase_timings"][phase_name][
+            "metrics"
+        ] = additional_metrics
 
         self.current_session["cost_tracking"][phase_name] += cost_usd
 
@@ -205,7 +209,9 @@ class PerformanceMonitor:
             }
         )
 
-        self.logger.info(f"Phase completed: {phase_name} - {duration:.1f}s, ${cost_usd:.4f}")
+        self.logger.info(
+            f"Phase completed: {phase_name} - {duration:.1f}s, ${cost_usd:.4f}"
+        )
 
     def validate_pipeline_results(
         self, orchestration_metrics, categories_path: Path, results_path: Path
@@ -265,7 +271,9 @@ class PerformanceMonitor:
         # Create validation report
         report = ValidationReport(
             timestamp=datetime.now().isoformat(),
-            dataset_info=(self.current_session["dataset_info"] if self.current_session else {}),
+            dataset_info=(
+                self.current_session["dataset_info"] if self.current_session else {}
+            ),
             cost_metrics=cost_metrics,
             performance_metrics=performance_metrics,
             accuracy_metrics=accuracy_metrics,
@@ -285,13 +293,17 @@ class PerformanceMonitor:
 
         # Extract cost data
         discovery_cost = getattr(orchestration_metrics, "discovery_cost", 0.0) or 0.0
-        application_cost = getattr(orchestration_metrics, "application_cost", 0.0) or 0.0
+        application_cost = (
+            getattr(orchestration_metrics, "application_cost", 0.0) or 0.0
+        )
         total_cost = orchestration_metrics.total_cost_usd
         cost_per_1k = orchestration_metrics.cost_per_1k_tickets
 
         # Calculate cost per category
         categories_discovered = orchestration_metrics.categories_discovered
-        cost_per_category = total_cost / categories_discovered if categories_discovered > 0 else 0.0
+        cost_per_category = (
+            total_cost / categories_discovered if categories_discovered > 0 else 0.0
+        )
 
         # Check target compliance
         meets_cost_target = cost_per_1k <= self.cost_target_per_1k
@@ -314,7 +326,9 @@ class PerformanceMonitor:
             cost_breakdown=cost_breakdown,
         )
 
-    def _calculate_performance_metrics(self, orchestration_metrics) -> PerformanceMetrics:
+    def _calculate_performance_metrics(
+        self, orchestration_metrics
+    ) -> PerformanceMetrics:
         """Calculate comprehensive performance metrics."""
 
         # Extract timing data
@@ -393,10 +407,14 @@ class PerformanceMonitor:
             )
 
         if classification_rate < 0.95:
-            validation_errors.append(f"Classification rate {classification_rate:.1%} below 95%")
+            validation_errors.append(
+                f"Classification rate {classification_rate:.1%} below 95%"
+            )
 
         if category_coverage < 0.8:
-            validation_errors.append(f"Category coverage {category_coverage:.1%} below 80%")
+            validation_errors.append(
+                f"Category coverage {category_coverage:.1%} below 80%"
+            )
 
         return AccuracyMetrics(
             avg_confidence=avg_confidence,
@@ -476,14 +494,20 @@ class PerformanceMonitor:
         next_actions = []
 
         if compliance_summary["overall_compliant"]:
-            next_actions.append("✅ All Opção D targets met - pipeline ready for production")
+            next_actions.append(
+                "✅ All Opção D targets met - pipeline ready for production"
+            )
             next_actions.append("Monitor performance in production environment")
             next_actions.append("Schedule periodic validation reviews")
         else:
-            next_actions.append("❌ Opção D targets not fully met - optimization required")
+            next_actions.append(
+                "❌ Opção D targets not fully met - optimization required"
+            )
 
             if not compliance_summary["meets_cost_target"]:
-                next_actions.append("🔧 Optimize cost: Review API usage and prompt efficiency")
+                next_actions.append(
+                    "🔧 Optimize cost: Review API usage and prompt efficiency"
+                )
                 next_actions.append("📊 Analyze cost breakdown by phase")
 
             if not compliance_summary["meets_time_target"]:
@@ -502,7 +526,9 @@ class PerformanceMonitor:
     def _save_validation_report(self, report: ValidationReport):
         """Save validation report to file."""
 
-        report_filename = f"validation_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        report_filename = (
+            f"validation_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
         report_path = self.monitoring_dir / report_filename
 
         # Convert dataclasses to dict for JSON serialization
@@ -538,7 +564,8 @@ class PerformanceMonitor:
 
         if output_path is None:
             output_path = (
-                self.monitoring_dir / f"dashboard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                self.monitoring_dir
+                / f"dashboard_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             )
 
         # Set up the plot
@@ -546,11 +573,16 @@ class PerformanceMonitor:
         fig.suptitle("Opção D Performance Dashboard", fontsize=16, fontweight="bold")
 
         # Extract data from reports
-        costs_per_1k = [report.cost_metrics.cost_per_1k_tickets for report in validation_reports]
-        processing_times = [
-            report.performance_metrics.total_processing_time / 60 for report in validation_reports
+        costs_per_1k = [
+            report.cost_metrics.cost_per_1k_tickets for report in validation_reports
         ]
-        confidences = [report.accuracy_metrics.avg_confidence for report in validation_reports]
+        processing_times = [
+            report.performance_metrics.total_processing_time / 60
+            for report in validation_reports
+        ]
+        confidences = [
+            report.accuracy_metrics.avg_confidence for report in validation_reports
+        ]
         classification_rates = [
             report.accuracy_metrics.classification_rate for report in validation_reports
         ]
@@ -570,7 +602,9 @@ class PerformanceMonitor:
         ax1.grid(True, alpha=0.3)
 
         # Plot 2: Processing Time
-        ax2.plot(range(len(processing_times)), processing_times, "g-o", label="Actual Time")
+        ax2.plot(
+            range(len(processing_times)), processing_times, "g-o", label="Actual Time"
+        )
         ax2.axhline(
             y=self.time_target_minutes,
             color="r",
@@ -636,7 +670,9 @@ class PerformanceMonitor:
         }
 
         # Cost comparison
-        cost_change = current_metrics.cost_per_1k_tickets - baseline_metrics.cost_per_1k_tickets
+        cost_change = (
+            current_metrics.cost_per_1k_tickets - baseline_metrics.cost_per_1k_tickets
+        )
         cost_pct_change = (cost_change / baseline_metrics.cost_per_1k_tickets) * 100
 
         if cost_change < 0:
@@ -649,7 +685,10 @@ class PerformanceMonitor:
             )
 
         # Time comparison
-        time_change = current_metrics.total_processing_time - baseline_metrics.total_processing_time
+        time_change = (
+            current_metrics.total_processing_time
+            - baseline_metrics.total_processing_time
+        )
         time_pct_change = (time_change / baseline_metrics.total_processing_time) * 100
 
         if time_change < 0:
@@ -665,7 +704,9 @@ class PerformanceMonitor:
         conf_change = current_metrics.avg_confidence - baseline_metrics.avg_confidence
 
         if conf_change > 0:
-            comparison_results["improvements"].append(f"Confidence improved by {conf_change:.3f}")
+            comparison_results["improvements"].append(
+                f"Confidence improved by {conf_change:.3f}"
+            )
         else:
             comparison_results["regressions"].append(
                 f"Confidence decreased by {abs(conf_change):.3f}"

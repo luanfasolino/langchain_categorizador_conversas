@@ -20,9 +20,10 @@ from datetime import datetime, timedelta
 # Add src to path
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
+
 def create_comprehensive_test_data():
     """Create comprehensive test dataset for orchestration testing"""
-    
+
     # Create realistic ticket conversations
     conversations = [
         # Payment Issues (Category 1)
@@ -44,8 +45,8 @@ def create_comprehensive_test_data():
             ('USER', 'Como posso contornar isso?'),
             ('AGENT', 'Tente novamente em alguns minutos ou use outro cartão')
         ]),
-        
-        # Booking Changes (Category 2) 
+
+        # Booking Changes (Category 2)
         ('BOOK001', [
             ('USER', 'Preciso alterar a data da minha reserva urgente'),
             ('AGENT', 'Posso ajudar com a alteração de data'),
@@ -64,7 +65,7 @@ def create_comprehensive_test_data():
             ('USER', 'Que documentos são necessários?'),
             ('AGENT', 'RG e CPF do novo titular, envie por email')
         ]),
-        
+
         # Technical Issues (Category 3)
         ('TECH001', [
             ('USER', 'Site está fora do ar, não consigo acessar'),
@@ -84,7 +85,7 @@ def create_comprehensive_test_data():
             ('USER', 'Verifiquei spam e não tem nada'),
             ('AGENT', 'Vou reenviar a confirmação pelo sistema')
         ]),
-        
+
         # Customer Service (Category 4)
         ('SERV001', [
             ('USER', 'Gostaria de falar com um supervisor'),
@@ -98,7 +99,7 @@ def create_comprehensive_test_data():
             ('USER', 'Funciona 24 horas?'),
             ('AGENT', 'Sim, atendimento 24h todos os dias')
         ]),
-        
+
         # Product Information (Category 5)
         ('PROD001', [
             ('USER', 'Quais são os planos disponíveis?'),
@@ -112,7 +113,7 @@ def create_comprehensive_test_data():
             ('USER', 'Quantos pontos preciso para um desconto?'),
             ('AGENT', '1000 pontos = 10% de desconto na próxima compra')
         ]),
-        
+
         # Refund Issues (Category 6)
         ('REF001', [
             ('USER', 'Solicitei reembolso há 10 dias e nada ainda'),
@@ -127,7 +128,7 @@ def create_comprehensive_test_data():
             ('AGENT', 'Para viagens, reembolso até 48h antes sem taxa')
         ])
     ]
-    
+
     # Convert to DataFrame format
     data = {
         'ticket_id': [],
@@ -136,9 +137,9 @@ def create_comprehensive_test_data():
         'message_sended_at': [],
         'category': []
     }
-    
+
     base_date = datetime(2024, 1, 1)
-    
+
     for ticket_id, messages in conversations:
         for i, (sender, text) in enumerate(messages):
             # Generate realistic timestamps
@@ -147,14 +148,15 @@ def create_comprehensive_test_data():
                 hours=9 + (i * 2),  # Business hours, 2h gaps
                 minutes=hash(text) % 60  # Random minutes
             )
-            
+
             data['ticket_id'].append(ticket_id)
             data['sender'].append(sender)
             data['text'].append(text)
             data['message_sended_at'].append(message_time.strftime('%Y-%m-%d %H:%M:%S'))
             data['category'].append('TEXT')
-    
+
     return pd.DataFrame(data)
+
 
 def create_mock_discovery_categories():
     """Create mock categories that would be discovered"""
@@ -262,38 +264,39 @@ def create_mock_discovery_categories():
         }
     }
 
+
 def test_orchestrator_integration():
     """Test the complete orchestrator integration"""
-    
+
     print("=== TWO-PHASE ORCHESTRATOR INTEGRATION TEST ===")
-    
+
     # Create comprehensive test data
     tickets_df = create_comprehensive_test_data()
     mock_categories = create_mock_discovery_categories()
-    
+
     print("\n📊 Test Dataset:")
     print(f"  Total messages: {len(tickets_df):,}")
     print(f"  Unique tickets: {tickets_df['ticket_id'].nunique():,}")
     print(f"  Date range: {tickets_df['message_sended_at'].min()} to {tickets_df['message_sended_at'].max()}")
-    
+
     try:
         # Import orchestrator components
         from discovery.orchestrator import (
-            TwoPhaseOrchestrator, 
-            OrchestrationConfig, 
+            TwoPhaseOrchestrator,
+            OrchestrationConfig,
             run_complete_pipeline
         )
-        
+
         print("\n✅ Orchestrator components imported successfully")
-        
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
-            
+
             # Save test data
             input_file = tmp_path / "test_tickets.csv"
             tickets_df.to_csv(input_file, sep=';', index=False, encoding='utf-8-sig')
             print(f"✅ Test data saved to {input_file}")
-            
+
             # Create custom configuration for testing
             test_config = OrchestrationConfig(
                 sample_rate=0.5,  # Use 50% for better testing
@@ -304,28 +307,28 @@ def test_orchestrator_integration():
                 confidence_threshold=0.85
             )
             print("✅ Test configuration created")
-            
+
             # Mock the discovery and application phases for testing
             print("\n🔄 Testing orchestrator initialization...")
-            
+
             with patch('discovery.orchestrator.IntelligentSampler') as mock_sampler_class, \
                  patch('discovery.orchestrator.CategoryDiscoverer') as mock_discoverer_class, \
                  patch('discovery.orchestrator.FastClassifier') as mock_classifier_class:
-                
+
                 # Mock sampler
                 mock_sampler = Mock()
                 sample_size = int(len(tickets_df) * test_config.sample_rate)
                 mock_sampler.sample_tickets.return_value = tickets_df.iloc[:sample_size]
                 mock_sampler_class.return_value = mock_sampler
-                
-                # Mock discoverer  
+
+                # Mock discoverer
                 mock_discoverer = Mock()
                 mock_discoverer.discover_categories.return_value = mock_categories
                 mock_discoverer_class.return_value = mock_discoverer
-                
+
                 # Mock classifier
                 mock_classifier = Mock()
-                
+
                 # Create realistic classification results
                 unique_tickets = tickets_df['ticket_id'].unique()
                 mock_results = []
@@ -345,16 +348,16 @@ def test_orchestrator_integration():
                         category_ids, confidence = [6], 0.87
                     else:
                         category_ids, confidence = [], 0.0
-                    
+
                     mock_results.append({
                         'ticket_id': ticket_id,
                         'category_ids': ','.join(map(str, category_ids)) if category_ids else '',
-                        'category_names': mock_categories['categories'][category_ids[0]-1]['display_name'] if category_ids else '',
+                        'category_names': mock_categories['categories'][category_ids[0] - 1]['display_name'] if category_ids else '',
                         'confidence': confidence,
                         'processing_time': 0.15,
                         'tokens_used': 125
                     })
-                
+
                 mock_results_df = pd.DataFrame(mock_results)
                 mock_classifier.classify_all_tickets.return_value = mock_results_df
                 mock_classifier.load_categories.return_value = mock_categories
@@ -367,7 +370,7 @@ def test_orchestrator_integration():
                     'total_tokens_used': 15250
                 }
                 mock_classifier_class.return_value = mock_classifier
-                
+
                 # Initialize orchestrator
                 orchestrator = TwoPhaseOrchestrator(
                     api_key="test_api_key",
@@ -375,91 +378,91 @@ def test_orchestrator_integration():
                     config=test_config
                 )
                 print("✅ Orchestrator initialized")
-                
+
                 # Test orchestrator configuration
                 assert orchestrator.config.sample_rate == 0.5
                 assert orchestrator.config.sampling_strategy == "stratified"
                 assert orchestrator.config.batch_size == 20
                 print("✅ Configuration validation passed")
-                
+
                 # Test data loading and validation
                 print("\n🔍 Testing data loading and validation...")
                 loaded_df = orchestrator._load_and_validate_input(input_file)
                 assert len(loaded_df) == len(tickets_df)
                 assert 'ticket_id' in loaded_df.columns
                 print(f"✅ Data loading successful: {len(loaded_df)} tickets")
-                
+
                 # Test discovery phase execution
                 print("\n🎯 Testing discovery phase...")
                 output_dir = tmp_path / "output"
                 output_dir.mkdir()
-                
+
                 categories_path = orchestrator._execute_discovery_phase(
                     loaded_df, output_dir, force_rediscovery=True
                 )
-                
+
                 assert categories_path.exists() or mock_discoverer.discover_categories.called
                 assert 'sample_size' in orchestrator.discovery_metrics
                 assert 'categories_discovered' in orchestrator.discovery_metrics
                 print("✅ Discovery phase completed")
                 print(f"  Sample size: {orchestrator.discovery_metrics.get('sample_size', 'mocked')}")
                 print(f"  Categories found: {orchestrator.discovery_metrics.get('categories_discovered', len(mock_categories['categories']))}")
-                
+
                 # Test application phase execution
                 print("\n🚀 Testing application phase...")
-                
+
                 # Save mock categories for application phase
                 categories_file = output_dir / "discovered_categories.json"
                 with open(categories_file, 'w', encoding='utf-8') as f:
                     json.dump(mock_categories, f, indent=2, ensure_ascii=False)
-                
-                results_path = orchestrator._execute_application_phase(
+
+                orchestrator._execute_application_phase(
                     loaded_df, categories_file, output_dir, force_reclassification=True
                 )
-                
+
                 assert 'total_tickets' in orchestrator.application_metrics
                 assert 'classified_tickets' in orchestrator.application_metrics
                 print("✅ Application phase completed")
                 print(f"  Total tickets: {orchestrator.application_metrics.get('total_tickets', len(loaded_df))}")
                 print(f"  Processing time: {orchestrator.application_metrics.get('processing_time', 'mocked'):.1f}s")
-                
+
                 # Test metrics generation
                 print("\n📈 Testing metrics generation...")
-                
+
                 # Mock start time for metrics calculation
                 orchestrator.start_time = 1000.0
-                
+
                 # Create mock results file for metrics
                 results_file = output_dir / "final_categorized_tickets.csv"
                 mock_results_df.to_csv(results_file, index=False)
-                
+
                 with patch('time.time', return_value=1060.0):  # 60 seconds total
                     metrics = orchestrator._generate_final_metrics(
                         loaded_df, categories_file, results_file, output_dir
                     )
-                
+
                 print("✅ Metrics generation completed")
                 print(f"  Total processing time: {metrics.total_processing_time:.1f}s")
                 print(f"  Cost per 1K tickets: ${metrics.cost_per_1k_tickets:.4f}")
                 print(f"  Average confidence: {metrics.avg_confidence:.3f}")
                 print(f"  Classification rate: {metrics.classification_rate:.1%}")
-                
+
                 # Test metrics saving
                 print("\n💾 Testing metrics persistence...")
                 orchestrator._save_orchestration_metrics(metrics, output_dir)
-                
+
                 metrics_file = output_dir / "orchestration_metrics.json"
                 assert metrics_file.exists()
-                
+
                 # Verify saved metrics
                 with open(metrics_file, 'r', encoding='utf-8') as f:
                     saved_metrics = json.load(f)
-                
+
                 assert 'orchestration_summary' in saved_metrics
                 assert 'phase_breakdown' in saved_metrics
                 assert 'target_compliance' in saved_metrics
                 print("✅ Metrics saved successfully")
-                
+
                 # Test target compliance
                 print("\n🎯 Testing Opção D compliance...")
                 print(f"  Cost target: ${test_config.cost_target_per_1k:.2f} per 1K tickets")
@@ -468,20 +471,20 @@ def test_orchestrator_integration():
                 print(f"  Confidence target: {test_config.confidence_threshold:.2f}")
                 print(f"  Actual confidence: {metrics.avg_confidence:.3f}")
                 print(f"  Meets confidence target: {'✅' if metrics.meets_confidence_target else '❌'}")
-                
+
                 # Test complete pipeline integration
                 print("\n🔄 Testing complete pipeline execution...")
-                
+
                 # Create fresh output directory
                 pipeline_output = tmp_path / "pipeline_test"
                 pipeline_output.mkdir()
-                
+
                 # Test run_complete_pipeline utility
                 with patch('discovery.orchestrator.TwoPhaseOrchestrator') as mock_orch_class:
                     mock_orch = Mock()
                     mock_orch.execute_complete_pipeline.return_value = metrics
                     mock_orch_class.return_value = mock_orch
-                    
+
                     pipeline_result = run_complete_pipeline(
                         input_file=str(input_file),
                         output_dir=str(pipeline_output),
@@ -491,10 +494,10 @@ def test_orchestrator_integration():
                             'batch_size': 25
                         }
                     )
-                    
+
                     assert pipeline_result == metrics
                     print("✅ Complete pipeline utility test passed")
-                
+
                 print("\n🎉 ALL ORCHESTRATOR INTEGRATION TESTS PASSED!")
                 print("\n📋 INTEGRATION SUMMARY:")
                 print("✅ Data loading and validation")
@@ -506,17 +509,17 @@ def test_orchestrator_integration():
                 print("✅ Error handling and robustness")
                 print("✅ Opção D compliance checking")
                 print("✅ Complete pipeline integration")
-                
+
                 print("\n🚀 TwoPhaseOrchestrator is ready for production use!")
                 print("The orchestrator successfully coordinates all Opção D components")
                 print("and provides comprehensive monitoring and validation.")
-        
+
     except Exception as e:
         print(f"\n❌ Integration test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
-    
+
     return True
 
 

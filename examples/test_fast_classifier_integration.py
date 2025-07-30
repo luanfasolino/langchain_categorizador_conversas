@@ -253,7 +253,7 @@ def test_complete_opcao_d_pipeline():
                 print("\n📊 Testing classification workflow...")
 
                 # Simulate batch processing
-                batches = [prepared_tickets[i:i+2] for i in range(0, len(prepared_tickets), 2)]
+                batches = [prepared_tickets[i:i + 2] for i in range(0, len(prepared_tickets), 2)]
                 print(f"Created {len(batches)} batches")
 
                 # Test individual ticket classification format

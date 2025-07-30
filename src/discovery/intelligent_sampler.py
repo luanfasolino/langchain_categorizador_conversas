@@ -72,7 +72,9 @@ class IntelligentSampler:
         # Calculate adaptive constraints if not provided
         total_tickets = len(df)
         if adaptive and (min_tickets is None or max_tickets is None):
-            adaptive_min, adaptive_max = self._calculate_adaptive_constraints(total_tickets)
+            adaptive_min, adaptive_max = self._calculate_adaptive_constraints(
+                total_tickets
+            )
             min_tickets = min_tickets or adaptive_min
             max_tickets = max_tickets or adaptive_max
         elif min_tickets is None or max_tickets is None:
@@ -157,7 +159,9 @@ class IntelligentSampler:
                 )
                 result = pd.concat([result, additional], ignore_index=True)
 
-        self.logger.info(f"Stratified sampling completed: {len(result)} tickets selected")
+        self.logger.info(
+            f"Stratified sampling completed: {len(result)} tickets selected"
+        )
         return result.drop(columns=["month_year"])
 
     def _diversity_sampling(self, df: pd.DataFrame, target_size: int) -> pd.DataFrame:
@@ -191,12 +195,16 @@ class IntelligentSampler:
 
         # Perform K-means clustering
         n_clusters = min(target_size, len(df))
-        kmeans = KMeans(n_clusters=n_clusters, random_state=self.random_state, n_init=10)
+        kmeans = KMeans(
+            n_clusters=n_clusters, random_state=self.random_state, n_init=10
+        )
 
         try:
             cluster_labels = kmeans.fit_predict(tfidf_matrix)
         except Exception as e:
-            self.logger.warning(f"K-means failed: {e}. Falling back to random sampling.")
+            self.logger.warning(
+                f"K-means failed: {e}. Falling back to random sampling."
+            )
             return df.sample(n=target_size, random_state=self.random_state)
 
         # Select representative from each cluster
@@ -230,7 +238,9 @@ class IntelligentSampler:
 
         result = df.iloc[selected_indices[:target_size]].copy()
 
-        self.logger.info(f"Diversity sampling completed: {len(result)} tickets selected")
+        self.logger.info(
+            f"Diversity sampling completed: {len(result)} tickets selected"
+        )
         return result
 
     def _hybrid_sampling(self, df: pd.DataFrame, target_size: int) -> pd.DataFrame:
@@ -278,19 +288,25 @@ class IntelligentSampler:
             # Small dataset: higher proportion for statistical significance
             min_tickets = max(100, int(total_tickets * 0.20))  # 20%
             max_tickets = max(500, int(total_tickets * 0.50))  # 50%
-            self.logger.info(f"Small dataset detected ({total_tickets}): using 20-50% sampling")
+            self.logger.info(
+                f"Small dataset detected ({total_tickets}): using 20-50% sampling"
+            )
 
         elif total_tickets < 20000:
             # Medium dataset: PRD recommended 2.6-5.2%
             min_tickets = max(500, int(total_tickets * 0.026))  # 2.6%
             max_tickets = min(1000, int(total_tickets * 0.052))  # 5.2%
-            self.logger.info(f"Medium dataset detected ({total_tickets}): using 2.6-5.2% sampling")
+            self.logger.info(
+                f"Medium dataset detected ({total_tickets}): using 2.6-5.2% sampling"
+            )
 
         else:
             # Large dataset: lower proportion but higher absolute numbers
             min_tickets = max(1000, int(total_tickets * 0.02))  # 2%
             max_tickets = min(2000, int(total_tickets * 0.04))  # 4%
-            self.logger.info(f"Large dataset detected ({total_tickets}): using 2-4% sampling")
+            self.logger.info(
+                f"Large dataset detected ({total_tickets}): using 2-4% sampling"
+            )
 
         return min_tickets, max_tickets
 
@@ -313,8 +329,12 @@ class IntelligentSampler:
         original_df["date"] = pd.to_datetime(original_df["ticket_created_at"])
         sample_df["date"] = pd.to_datetime(sample_df["ticket_created_at"])
 
-        original_monthly = original_df["date"].dt.to_period("M").value_counts(normalize=True)
-        sample_monthly = sample_df["date"].dt.to_period("M").value_counts(normalize=True)
+        original_monthly = (
+            original_df["date"].dt.to_period("M").value_counts(normalize=True)
+        )
+        sample_monthly = (
+            sample_df["date"].dt.to_period("M").value_counts(normalize=True)
+        )
 
         # Calculate KL divergence for temporal distribution
         common_months = set(original_monthly.index) & set(sample_monthly.index)

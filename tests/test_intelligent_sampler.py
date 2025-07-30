@@ -2,14 +2,14 @@
 Tests for IntelligentSampler module
 """
 
-import pytest
-import pandas as pd
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
+import pytest
+import pandas as pd
 from discovery.intelligent_sampler import IntelligentSampler, create_diversity_report
 
 
@@ -20,13 +20,13 @@ class TestIntelligentSampler:
     def sample_tickets_df(self):
         """Create sample tickets DataFrame for testing"""
         data = {
-            'ticket_id': [f'T{i:03d}' for i in range(1, 101)],  # 100 tickets
-            'text': [f'Sample ticket text {i}' for i in range(1, 101)],
-            'sender': ['USER'] * 100,
-            'ticket_created_at': [
-                f'2024-01-{(i % 31) + 1:02d} 10:00:00' for i in range(100)
+            "ticket_id": [f"T{i:03d}" for i in range(1, 101)],  # 100 tickets
+            "text": [f"Sample ticket text {i}" for i in range(1, 101)],
+            "sender": ["USER"] * 100,
+            "ticket_created_at": [
+                f"2024-01-{(i % 31) + 1:02d} 10:00:00" for i in range(100)
             ],
-            'category': ['TEXT'] * 100
+            "category": ["TEXT"] * 100,
         }
         return pd.DataFrame(data)
 
@@ -72,7 +72,7 @@ class TestIntelligentSampler:
         """Test stratified sampling strategy"""
         sample_size = 0.15  # 15%
         sampled_df = sampler_stratified.sample_tickets(
-            sample_tickets_df, sample_size=sample_size
+            sample_tickets_df, sample_size=sample_size, min_tickets=1, max_tickets=50
         )
 
         assert isinstance(sampled_df, pd.DataFrame)
@@ -86,7 +86,7 @@ class TestIntelligentSampler:
         """Test diversity sampling strategy"""
         sample_size = 0.10  # 10%
         sampled_df = sampler_diversity.sample_tickets(
-            sample_tickets_df, sample_size=sample_size
+            sample_tickets_df, sample_size=sample_size, min_tickets=1, max_tickets=50
         )
 
         assert isinstance(sampled_df, pd.DataFrame)
@@ -97,7 +97,7 @@ class TestIntelligentSampler:
         """Test hybrid sampling strategy"""
         sample_size = 0.20  # 20%
         sampled_df = sampler_hybrid.sample_tickets(
-            sample_tickets_df, sample_size=sample_size
+            sample_tickets_df, sample_size=sample_size, min_tickets=1, max_tickets=50
         )
 
         assert isinstance(sampled_df, pd.DataFrame)
@@ -109,10 +109,7 @@ class TestIntelligentSampler:
     ):
         """Test sampling with min/max constraints"""
         sampled_df = sampler_stratified.sample_tickets(
-            sample_tickets_df,
-            sample_size=0.05,  # 5%
-            min_tickets=20,
-            max_tickets=30
+            sample_tickets_df, sample_size=0.05, min_tickets=20, max_tickets=30  # 5%
         )
 
         assert isinstance(sampled_df, pd.DataFrame)

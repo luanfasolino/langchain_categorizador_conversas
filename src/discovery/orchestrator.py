@@ -221,13 +221,17 @@ class TwoPhaseOrchestrator(BaseProcessor):
 
             # Validate required columns
             required_columns = ["ticket_id", "text", "sender", "category"]
-            missing_columns = [col for col in required_columns if col not in tickets_df.columns]
+            missing_columns = [
+                col for col in required_columns if col not in tickets_df.columns
+            ]
 
             if missing_columns:
                 raise ValueError(f"Missing required columns: {missing_columns}")
 
             # Filter to TEXT category only
-            text_tickets = tickets_df[tickets_df["category"].str.upper() == "TEXT"].copy()
+            text_tickets = tickets_df[
+                tickets_df["category"].str.upper() == "TEXT"
+            ].copy()
 
             if text_tickets.empty:
                 raise ValueError("No tickets found with category='TEXT'")
@@ -250,7 +254,9 @@ class TwoPhaseOrchestrator(BaseProcessor):
 
         # Check if categories already exist
         if categories_path.exists() and not force_rediscovery:
-            self.logger.info(f"Categories already exist at {categories_path}, skipping discovery")
+            self.logger.info(
+                f"Categories already exist at {categories_path}, skipping discovery"
+            )
             self.discovery_metrics = {"skipped": True, "reason": "categories_exist"}
             return categories_path
 
@@ -292,7 +298,9 @@ class TwoPhaseOrchestrator(BaseProcessor):
                 "sample_size": sample_size,
                 "sample_rate": self.config.sample_rate,
                 "strategy": self.config.sampling_strategy,
-                "categories_discovered": len(discovered_categories.get("categories", [])),
+                "categories_discovered": len(
+                    discovered_categories.get("categories", [])
+                ),
                 "processing_time": discovery_time,
                 "cost_estimate": self._estimate_discovery_cost(sample_size),
             }
@@ -321,7 +329,9 @@ class TwoPhaseOrchestrator(BaseProcessor):
 
         # Check if results already exist
         if results_path.exists() and not force_reclassification:
-            self.logger.info(f"Results already exist at {results_path}, skipping classification")
+            self.logger.info(
+                f"Results already exist at {results_path}, skipping classification"
+            )
             self.application_metrics = {"skipped": True, "reason": "results_exist"}
             return results_path
 
@@ -401,7 +411,9 @@ class TwoPhaseOrchestrator(BaseProcessor):
         confidences = results_df["confidence"].astype(float)
         avg_confidence = confidences.mean()
         classified_count = len(results_df[results_df["category_ids"] != ""])
-        classification_rate = classified_count / total_tickets if total_tickets > 0 else 0
+        classification_rate = (
+            classified_count / total_tickets if total_tickets > 0 else 0
+        )
 
         # Target validation
         meets_cost_target = cost_per_1k <= self.config.cost_target_per_1k
@@ -422,7 +434,9 @@ class TwoPhaseOrchestrator(BaseProcessor):
             meets_confidence_target=meets_confidence_target,
         )
 
-    def _save_orchestration_metrics(self, metrics: OrchestrationMetrics, output_dir: Path):
+    def _save_orchestration_metrics(
+        self, metrics: OrchestrationMetrics, output_dir: Path
+    ):
         """Save orchestration metrics to JSON file."""
         metrics_path = output_dir / self.config.metrics_filename
 
@@ -509,7 +523,9 @@ class TwoPhaseOrchestrator(BaseProcessor):
         self.logger.info("=== FINAL ORCHESTRATION SUMMARY ===")
         self.logger.info(f"📊 Total tickets processed: {metrics.total_tickets:,}")
         self.logger.info(f"🎯 Categories discovered: {metrics.categories_discovered}")
-        self.logger.info(f"⏱️ Total processing time: {metrics.total_processing_time:.1f}s")
+        self.logger.info(
+            f"⏱️ Total processing time: {metrics.total_processing_time:.1f}s"
+        )
         self.logger.info(f"💰 Total cost: ${metrics.total_cost_usd:.4f}")
         self.logger.info(f"💰 Cost per 1K tickets: ${metrics.cost_per_1k_tickets:.4f}")
         self.logger.info(f"📈 Average confidence: {metrics.avg_confidence:.3f}")

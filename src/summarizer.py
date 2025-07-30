@@ -22,7 +22,9 @@ class TicketSummarizer(BaseProcessor):
         max_workers: int = None,
         use_cache: bool = True,
     ):
-        super().__init__(api_key, database_dir, max_workers=max_workers, use_cache=use_cache)
+        super().__init__(
+            api_key, database_dir, max_workers=max_workers, use_cache=use_cache
+        )
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash", temperature=0.3, google_api_key=api_key
         )
@@ -115,9 +117,13 @@ class TicketSummarizer(BaseProcessor):
         docs = [Document(page_content=chunk) for chunk in chunks]
 
         # Configura as chains de sumarização usando o novo formato
-        map_chain = RunnablePassthrough() | self.map_template | self.llm | StrOutputParser()
+        map_chain = (
+            RunnablePassthrough() | self.map_template | self.llm | StrOutputParser()
+        )
 
-        combine_chain = RunnablePassthrough() | self.combine_template | self.llm | StrOutputParser()
+        combine_chain = (
+            RunnablePassthrough() | self.combine_template | self.llm | StrOutputParser()
+        )
 
         # 1. Map: Sumariza cada chunk (agora com processamento paralelo)
         print("\nRealizando sumarização dos chunks em paralelo...")
@@ -152,10 +158,13 @@ class TicketSummarizer(BaseProcessor):
                 }
 
         # Processa os chunks em paralelo
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_workers
+        ) as executor:
             # Submete todos os chunks para processamento
             future_to_chunk = {
-                executor.submit(process_chunk, i, doc): (i, doc) for i, doc in enumerate(docs, 1)
+                executor.submit(process_chunk, i, doc): (i, doc)
+                for i, doc in enumerate(docs, 1)
             }
 
             # Coleta os resultados à medida que são concluídos
@@ -228,7 +237,11 @@ class TicketSummarizer(BaseProcessor):
 
             # Validação e normalização do JSON
             results = json.loads(json_str)
-            if not isinstance(results, dict) or "bullets" not in results or "resumo" not in results:
+            if (
+                not isinstance(results, dict)
+                or "bullets" not in results
+                or "resumo" not in results
+            ):
                 print("Erro: Resposta não está no formato esperado")
                 return None
 
@@ -269,7 +282,9 @@ class TicketSummarizer(BaseProcessor):
             print("\n=== Resumo do Uso de Tokens ===")
             print(f"Total de Tokens de Entrada: {total_input_tokens:,}")
             print(f"Total de Tokens de Saída: {total_output_tokens:,}")
-            print(f"Total Geral de Tokens: {(total_input_tokens + total_output_tokens):,}")
+            print(
+                f"Total Geral de Tokens: {(total_input_tokens + total_output_tokens):,}"
+            )
 
             # Estimativa de custo
             estimated_cost = (total_input_tokens + total_output_tokens) * 0.00025 / 1000
@@ -283,7 +298,9 @@ class TicketSummarizer(BaseProcessor):
 
             # Salva bullets em CSV
             bullets_df = pd.DataFrame(valid_bullets)
-            bullets_df.to_csv(output_file_csv, sep=";", index=False, encoding="utf-8-sig")
+            bullets_df.to_csv(
+                output_file_csv, sep=";", index=False, encoding="utf-8-sig"
+            )
 
             # Salva resumo em TXT
             with open(output_file_txt, "w", encoding="utf-8") as f:
