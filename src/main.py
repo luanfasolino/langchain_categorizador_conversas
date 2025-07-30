@@ -40,9 +40,7 @@ def select_input_file(database_dir, specified_file=None):
 
     if not available_files:
         print(f"❌ Nenhum arquivo CSV ou Excel encontrado em: {database_dir}")
-        print(
-            "💡 Coloque seu arquivo na pasta 'database' com extensão .csv, .xlsx ou .xls"
-        )
+        print("💡 Coloque seu arquivo na pasta 'database' com extensão .csv, .xlsx ou .xls")
         return None
 
     # Se há apenas um arquivo, pergunta se quer usar

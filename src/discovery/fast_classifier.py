@@ -146,18 +146,14 @@ class FastClassifier(BaseProcessor):
             return self.categories
 
         except Exception as e:
-            self.logger.error(
-                f"Failed to load categories from {categories_path}: {str(e)}"
-            )
+            self.logger.error(f"Failed to load categories from {categories_path}: {str(e)}")
             raise
 
     def _setup_classification_chain(self):
         """Setup the optimized classification chain following Opção D specs."""
 
         if not self.categories:
-            raise ValueError(
-                "Categories must be loaded before setting up classification chain"
-            )
+            raise ValueError("Categories must be loaded before setting up classification chain")
 
         # Build category list for prompt (optimized format)
         category_list = []
@@ -165,9 +161,7 @@ class FastClassifier(BaseProcessor):
             cat_text = f"{cat['id']}. {cat['display_name']}: {cat['description']}"
             # Add key examples for better accuracy
             if cat.get("examples"):
-                examples = ", ".join(
-                    cat["examples"][:2]
-                )  # Max 2 examples for token efficiency
+                examples = ", ".join(cat["examples"][:2])  # Max 2 examples for token efficiency
                 cat_text += f" (ex: {examples})"
             category_list.append(cat_text)
 
@@ -193,12 +187,8 @@ TICKET:
 CLASSIFICAÇÃO:"""
 
         # Create optimized chain using LCEL (Opção D style)
-        self.classification_prompt = ChatPromptTemplate.from_template(
-            classification_template
-        )
-        self.classification_chain = (
-            self.classification_prompt | self.llm | StrOutputParser()
-        )
+        self.classification_prompt = ChatPromptTemplate.from_template(classification_template)
+        self.classification_chain = self.classification_prompt | self.llm | StrOutputParser()
 
         self.logger.info("Classification chain setup completed with optimized prompts")
 
@@ -248,14 +238,10 @@ CLASSIFICAÇÃO:"""
             batch_results = self._process_classification_batches(prepared_tickets)
 
             # Consolidate results
-            classification_results = self._consolidate_classification_results(
-                batch_results
-            )
+            classification_results = self._consolidate_classification_results(batch_results)
 
             # Create results DataFrame
-            results_df = self._create_results_dataframe(
-                classification_results, tickets_df
-            )
+            results_df = self._create_results_dataframe(classification_results, tickets_df)
 
             # Cache results
             self._save_to_cache(cache_key, results_df)
@@ -274,9 +260,7 @@ CLASSIFICAÇÃO:"""
             self.logger.error(f"Classification failed: {str(e)}")
             raise
 
-    def _prepare_tickets_for_classification(
-        self, tickets_df: pd.DataFrame
-    ) -> List[Dict[str, str]]:
+    def _prepare_tickets_for_classification(self, tickets_df: pd.DataFrame) -> List[Dict[str, str]]:
         """
         Prepare tickets for classification processing.
 
@@ -306,9 +290,7 @@ CLASSIFICAÇÃO:"""
 
             if conversation_parts:  # Only include tickets with content
                 ticket_text = "\n".join(conversation_parts)
-                prepared_tickets.append(
-                    {"ticket_id": str(ticket_id), "text": ticket_text}
-                )
+                prepared_tickets.append({"ticket_id": str(ticket_id), "text": ticket_text})
 
         self.logger.info(f"Prepared {len(prepared_tickets)} tickets for classification")
         return prepared_tickets
@@ -331,9 +313,7 @@ CLASSIFICAÇÃO:"""
             for i in range(0, len(prepared_tickets), self.batch_size)
         ]
 
-        self.logger.info(
-            f"Processing {len(batches)} batches with {self.max_workers} workers"
-        )
+        self.logger.info(f"Processing {len(batches)} batches with {self.max_workers} workers")
 
         batch_results = []
 
@@ -341,9 +321,7 @@ CLASSIFICAÇÃO:"""
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submit all batches
             future_to_batch = {
-                executor.submit(
-                    self._process_classification_batch, batch, batch_idx
-                ): batch_idx
+                executor.submit(self._process_classification_batch, batch, batch_idx): batch_idx
                 for batch_idx, batch in enumerate(batches)
             }
 
@@ -358,8 +336,7 @@ CLASSIFICAÇÃO:"""
                     processed = len(batch_results)
                     total = len(batches)
                     self.logger.info(
-                        f"Completed batch {batch_idx + 1}/{total} "
-                        f"({processed/total:.1%} done)"
+                        f"Completed batch {batch_idx + 1}/{total} " f"({processed/total:.1%} done)"
                     )
 
                 except Exception as e:
@@ -401,14 +378,10 @@ CLASSIFICAÇÃO:"""
                 )
 
                 # Parse classification result
-                classification_data = self._parse_classification_response(
-                    classification_response
-                )
+                classification_data = self._parse_classification_response(classification_response)
 
                 # Estimate tokens (following Opção D token estimation)
-                tokens_used = (
-                    self.estimate_tokens(ticket["text"]) + self.classify_max_tokens
-                )
+                tokens_used = self.estimate_tokens(ticket["text"]) + self.classify_max_tokens
                 total_tokens += tokens_used
 
                 # Create result
@@ -471,9 +444,7 @@ CLASSIFICAÇÃO:"""
             import re
 
             category_numbers = re.findall(r"\b(\d+)\b", response)
-            categories = [
-                int(num) for num in category_numbers[: self.max_categories_per_ticket]
-            ]
+            categories = [int(num) for num in category_numbers[: self.max_categories_per_ticket]]
 
             return {
                 "categories": categories,
@@ -531,13 +502,9 @@ CLASSIFICAÇÃO:"""
                 {
                     "ticket_id": result.ticket_id,
                     "category_ids": (
-                        ",".join(map(str, result.categories))
-                        if result.categories
-                        else ""
+                        ",".join(map(str, result.categories)) if result.categories else ""
                     ),
-                    "category_names": (
-                        ",".join(category_names) if category_names else ""
-                    ),
+                    "category_names": (",".join(category_names) if category_names else ""),
                     "confidence": result.confidence,
                     "processing_time": result.processing_time,
                     "tokens_used": result.tokens_used,
@@ -550,9 +517,7 @@ CLASSIFICAÇÃO:"""
         results_df["classification_timestamp"] = datetime.now().isoformat()
         results_df["model_used"] = self.model_name
 
-        self.logger.info(
-            f"Created results DataFrame with {len(results_df)} classified tickets"
-        )
+        self.logger.info(f"Created results DataFrame with {len(results_df)} classified tickets")
         return results_df
 
     def _get_category_name(self, category_id: int) -> Optional[str]:
@@ -592,9 +557,7 @@ CLASSIFICAÇÃO:"""
 
         # Cost estimation (following Opção D pricing)
         estimated_cost = self._estimate_cost(total_tokens)
-        cost_per_1k = (
-            (estimated_cost / total_tickets) * 1000 if total_tickets > 0 else 0
-        )
+        cost_per_1k = (estimated_cost / total_tickets) * 1000 if total_tickets > 0 else 0
 
         # Confidence statistics
         confidences = results_df["confidence"].astype(float)
@@ -652,9 +615,7 @@ CLASSIFICAÇÃO:"""
         # Basic stats
         total_tickets = len(results_df)
         classified_tickets = len(results_df[results_df["category_ids"] != ""])
-        classification_rate = (
-            classified_tickets / total_tickets if total_tickets > 0 else 0
-        )
+        classification_rate = classified_tickets / total_tickets if total_tickets > 0 else 0
 
         # Category distribution
         all_categories = []

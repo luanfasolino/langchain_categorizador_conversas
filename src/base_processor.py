@@ -47,12 +47,8 @@ class BaseProcessor:
     def clean_text(self, text: str) -> str:
         """Limpa o texto removendo ou substituindo caracteres que podem causar problemas."""
         # Remove mensagens padrão de atendimento
-        text = re.sub(
-            r"Estamos te conectando a um especialista humano.*?:?\)\s*", "", text
-        )
-        text = re.sub(
-            r"Olá,?\s+[^,]+,\s+sou\s+[^,]+\s+e\s+já\s+estou\s+aqui\.?\s*", "", text
-        )
+        text = re.sub(r"Estamos te conectando a um especialista humano.*?:?\)\s*", "", text)
+        text = re.sub(r"Olá,?\s+[^,]+,\s+sou\s+[^,]+\s+e\s+já\s+estou\s+aqui\.?\s*", "", text)
 
         # Remove asteriscos usados para ênfase
         text = re.sub(r"\*([^\*]+)\*", r"\1", text)
@@ -61,9 +57,7 @@ class BaseProcessor:
         text = "".join(char for char in text if ord(char) >= 32 or char == "\n")
 
         # Substitui aspas tipográficas por aspas simples
-        text = (
-            text.replace('"', '"').replace('"', '"').replace(""", "'").replace(""", "'")
-        )
+        text = text.replace('"', '"').replace('"', '"').replace(""", "'").replace(""", "'")
 
         # Trata URLs - substitui por uma representação mais segura
         text = re.sub(
@@ -253,9 +247,7 @@ class BaseProcessor:
         batch_tokens += header_tokens
 
         # Estima total de batches
-        estimated_total_batches = (
-            sum(len(t["text"]) // 4 for t in tickets) // token_limit
-        ) + 1
+        estimated_total_batches = (sum(len(t["text"]) // 4 for t in tickets) // token_limit) + 1
         print(f"\nTotal estimado de batches: {estimated_total_batches}")
 
         def process_batch(tickets_text, retry_count=0):
@@ -356,9 +348,7 @@ class BaseProcessor:
                         f.write(f"Linha: {e.lineno}, Coluna: {e.colno}\n")
                         context_start = max(0, e.pos - 100)
                         context_end = min(len(e.doc), e.pos + 100)
-                        f.write(
-                            f"Contexto do erro:\n{e.doc[context_start:context_end]}\n"
-                        )
+                        f.write(f"Contexto do erro:\n{e.doc[context_start:context_end]}\n")
 
                     f.write("\n=== Resposta da LLM ===\n")
                     if "response" in locals():
@@ -372,9 +362,7 @@ class BaseProcessor:
                 print(f"Log detalhado do erro salvo em: {log_file}")
 
                 if retry_count < max_retries:
-                    print(
-                        f"Erro no processamento, tentativa {retry_count + 1} de {max_retries}"
-                    )
+                    print(f"Erro no processamento, tentativa {retry_count + 1} de {max_retries}")
                     time.sleep(1)
                     return process_batch(tickets_text, retry_count + 1)
                 else:
@@ -385,10 +373,7 @@ class BaseProcessor:
             batch_tickets.append(ticket["text"])
             batch_tokens += self.estimate_tokens(ticket["text"])
 
-            if (
-                batch_tokens >= token_limit
-                or len(batch_tickets) >= self.max_tickets_per_batch
-            ):
+            if batch_tokens >= token_limit or len(batch_tickets) >= self.max_tickets_per_batch:
                 batch_result = process_batch(" ".join(batch_tickets))
                 if batch_result:
                     results.append(batch_result)
@@ -500,12 +485,10 @@ class BaseProcessor:
         print(f"Registros após remover mensagens AI: {len(df_filtered)}")
 
         # Conta mensagens de USER e AGENT por ticket (HELPDESK_INTEGRATION = AGENT)
-        user_messages = df_filtered[df_filtered["sender"] == "USER"][
+        user_messages = df_filtered[df_filtered["sender"] == "USER"]["ticket_id"].value_counts()
+        agent_messages = df_filtered[df_filtered["sender"].isin(["AGENT", "HELPDESK_INTEGRATION"])][
             "ticket_id"
         ].value_counts()
-        agent_messages = df_filtered[
-            df_filtered["sender"].isin(["AGENT", "HELPDESK_INTEGRATION"])
-        ]["ticket_id"].value_counts()
 
         # Identifica tickets com pelo menos duas mensagens de cada
         valid_tickets = set(user_messages[user_messages >= 2].index).intersection(
@@ -552,9 +535,7 @@ class BaseProcessor:
         batch_tokens += header_tokens
 
         # Estima total de batches
-        estimated_total_batches = (
-            sum(len(t["text"]) // 4 for t in tickets) // token_limit
-        ) + 1
+        estimated_total_batches = (sum(len(t["text"]) // 4 for t in tickets) // token_limit) + 1
         print(f"\nTotal estimado de batches: {estimated_total_batches}")
 
         # Prepara os batches
@@ -585,8 +566,7 @@ class BaseProcessor:
             try:
                 # Constrói o texto para este batch
                 batch_text = "\n\n".join(
-                    f"Ticket {ticket['ticket_id']}:\n{ticket['text']}"
-                    for ticket in batch
+                    f"Ticket {ticket['ticket_id']}:\n{ticket['text']}" for ticket in batch
                 )
 
                 input_tokens = self.estimate_tokens(batch_text)
@@ -619,8 +599,7 @@ class BaseProcessor:
             except Exception as e:
                 # Log do erro
                 log_file = (
-                    self.database_dir
-                    / f"error_log_batch_{batch_index}_{int(time.time())}.log"
+                    self.database_dir / f"error_log_batch_{batch_index}_{int(time.time())}.log"
                 )
                 with open(log_file, "w", encoding="utf-8") as f:
                     f.write(f"Erro no batch {batch_index}: {str(e)}\n")
@@ -643,9 +622,7 @@ class BaseProcessor:
         total_output_tokens = 0
         batch_results = []
 
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers
-        ) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submete todos os batches para processamento
             future_to_batch = {
                 executor.submit(process_single_batch, i, batch): (i, batch)
@@ -691,9 +668,7 @@ class BaseProcessor:
             chunk_text = doc.page_content
             cache_key = self._generate_cache_key(
                 {
-                    "chunk": chunk_text[
-                        :1000
-                    ],  # Usa os primeiros 1000 caracteres para o hash
+                    "chunk": chunk_text[:1000],  # Usa os primeiros 1000 caracteres para o hash
                     "length": len(chunk_text),
                     "method": f"{processor_name}_chunk",
                 }
@@ -736,13 +711,10 @@ class BaseProcessor:
                 }
 
         # Processa os chunks em paralelo
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers
-        ) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submete todos os chunks para processamento
             future_to_chunk = {
-                executor.submit(process_chunk, i, doc): (i, doc)
-                for i, doc in enumerate(chunks, 1)
+                executor.submit(process_chunk, i, doc): (i, doc) for i, doc in enumerate(chunks, 1)
             }
 
             # Coleta os resultados à medida que são concluídos
@@ -779,9 +751,7 @@ class BaseProcessor:
         total_output_tokens = 0
 
         # Processa os batches em paralelo
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers
-        ) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Submete todos os batches para processamento
             future_to_batch = {
                 executor.submit(
