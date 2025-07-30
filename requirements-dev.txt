@@ -1,0 +1,12 @@
+# Ferramentas de desenvolvimento e qualidade
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# Para testes com mocks
+pytest-mock>=3.10.0
+
+# Para análise de tipos com pandas/langchain
+types-requests>=2.31.0
