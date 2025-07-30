@@ -5,4 +5,5 @@ python-dotenv==1.0.1
 requests==2.31.0
 openpyxl==3.1.2  # Para ler arquivos Excel
 google-generativeai>=0.3.1 
-tqdm>=4.66.1  # Para mostrar barras de progresso 
+tqdm>=4.66.1  # Para mostrar barras de progresso
+scikit-learn>=1.3.0  # Para TF-IDF e clustering no IntelligentSampler
