@@ -195,7 +195,7 @@ class TicketCategorizer(BaseProcessor):
             }
         }
         
-        print(f"🚀 Configurando executor paralelo:")
+        print("🚀 Configurando executor paralelo:")
         print(f"   • Workers: {executor_config['max_workers']}")
         print(f"   • CPUs disponíveis: {executor_config['performance_metrics']['cpu_count']}")
         print(f"   • Limite recomendado: {executor_config['performance_metrics']['recommended_workers']}")
@@ -271,7 +271,7 @@ class TicketCategorizer(BaseProcessor):
             ]
         }
         
-        print(f"🔄 Configurando estratégia de retry:")
+        print("🔄 Configurando estratégia de retry:")
         print(f"   • Max retries: {retry_config['max_retries']}")
         print(f"   • Base delay: {retry_config['base_delay']}s")
         print(f"   • Max delay: {retry_config['max_delay']}s")
@@ -410,15 +410,15 @@ class TicketCategorizer(BaseProcessor):
             "budget_alerts": []
         }
         
-        print(f"💰 Sistema de Token Tracking configurado:")
+        print("💰 Sistema de Token Tracking configurado:")
         print(f"   • Input: ${tracking_config['cost_per_1k_input_tokens']}/1K tokens")
         print(f"   • Output: ${tracking_config['cost_per_1k_output_tokens']}/1K tokens")
         print(f"   • Monitoramento de budget: {'Ativo' if tracking_config['budget_monitoring'] else 'Inativo'}")
         
         return tracking_config
     
-    def track_token_usage(self, phase: str, input_tokens: int, output_tokens: int, 
-                         additional_context: dict = None) -> dict:
+    def track_token_usage(self, phase: str, input_tokens: int, output_tokens: int,
+                          additional_context: dict = None) -> dict:
         """
         Registra uso de tokens com detalhamento por fase e cálculo de custos.
         Segue melhores práticas Context7 para tracking preciso.
@@ -606,7 +606,7 @@ class TicketCategorizer(BaseProcessor):
         print(f"Total de tickets para processar: {len(tickets)}")
 
         # Inicializa o sistema de tracking de tokens - Task 1.5
-        tracking_config = self.setup_token_tracking_system()
+        self.setup_token_tracking_system()
         
         # Gera projeção de custos inicial
         initial_projection = self.generate_cost_projection(len(tickets))
@@ -630,7 +630,7 @@ class TicketCategorizer(BaseProcessor):
         combine_chain = self.combine_template | self.llm | StrOutputParser()
 
         # Configura executor paralelo Task 1.2
-        executor_config = self.setup_parallel_executor()
+        self.setup_parallel_executor()
         
         # 1. Map: Analisa cada chunk (processamento paralelo otimizado)
         print("\n🔄 Fase MAP: Realizando análise dos chunks em paralelo...")
@@ -738,7 +738,7 @@ class TicketCategorizer(BaseProcessor):
             
             # Estatísticas de performance
             avg_processing_time = total_processing_time / successful_chunks if successful_chunks > 0 else 0
-            print(f"\n📊 Estatísticas de Performance MAP:")
+            print("\n📊 Estatísticas de Performance MAP:")
             print(f"   • Chunks processados: {successful_chunks}/{len(docs)}")
             print(f"   • Tempo médio por chunk: {avg_processing_time:.2f}s")
             print(f"   • Tempo total de processamento: {total_processing_time:.2f}s")
@@ -960,7 +960,7 @@ class TicketCategorizer(BaseProcessor):
             avg_batch_time = total_batch_processing_time / successful_batches if successful_batches > 0 else 0
             categorize_phase_data = self.token_tracker["phase_breakdown"]["categorize"]
             
-            print(f"\n📊 Estatísticas de Performance CATEGORIZE:")
+            print("\n📊 Estatísticas de Performance CATEGORIZE:")
             print(f"   • Batches processados: {successful_batches}/{len(ticket_batches)}")
             print(f"   • Tempo médio por batch: {avg_batch_time:.2f}s")
             print(f"   • Tempo total de processamento: {total_batch_processing_time:.2f}s")
@@ -1006,7 +1006,7 @@ class TicketCategorizer(BaseProcessor):
             
             # Resumo da sessão
             session_summary = comprehensive_report["session_summary"]
-            print(f"💰 RESUMO FINAL:")
+            print("💰 RESUMO FINAL:")
             print(f"   • Total Input Tokens: {session_summary['total_input_tokens']:,}")
             print(f"   • Total Output Tokens: {session_summary['total_output_tokens']:,}")
             print(f"   • Total Geral: {session_summary['total_tokens']:,}")
@@ -1014,7 +1014,7 @@ class TicketCategorizer(BaseProcessor):
             print(f"   • Duração: {session_summary['session_duration_seconds']:.1f}s")
             
             # Breakdown por fase
-            print(f"\n🔍 BREAKDOWN POR FASE:")
+            print("\n🔍 BREAKDOWN POR FASE:")
             phase_breakdown = comprehensive_report["phase_breakdown"]
             for phase, data in phase_breakdown.items():
                 phase_name = phase.upper()
@@ -1026,24 +1026,24 @@ class TicketCategorizer(BaseProcessor):
             
             # Métricas de performance
             performance = comprehensive_report["performance_metrics"]
-            print(f"\n⚡ PERFORMANCE:")
+            print("\n⚡ PERFORMANCE:")
             print(f"   • Tokens por segundo: {performance['tokens_per_second']:.1f}")
             print(f"   • Custo por 1K tokens: ${performance['cost_efficiency']['cost_per_1k_tokens']}")
             print(f"   • Ratio Input/Output: {performance['cost_efficiency']['input_output_ratio']:.2f}")
             
             # Recomendações
-            print(f"\n💡 RECOMENDAÇÕES:")
+            print("\n💡 RECOMENDAÇÕES:")
             recommendations = comprehensive_report["recommendations"]
             for rec in recommendations:
                 print(f"   {rec}")
             
             # Alertas de budget
             if comprehensive_report["budget_alerts"]:
-                print(f"\n🚨 ALERTAS DE BUDGET:")
+                print("\n🚨 ALERTAS DE BUDGET:")
                 for alert in comprehensive_report["budget_alerts"]:
                     print(f"   {alert}")
             
-            print(f"\n=== 🔄 Estatísticas de Error Handling ===")
+            print("\n=== 🔄 Estatísticas de Error Handling ===")
             print(f"Chunks processados com sucesso: {successful_chunks}/{len(docs)}")
             print(f"Batches processados com sucesso: {successful_batches}/{len(ticket_batches)}")
             print(f"Taxa de sucesso chunks: {(successful_chunks/len(docs)*100):.1f}%")

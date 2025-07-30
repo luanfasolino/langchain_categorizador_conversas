@@ -3,78 +3,78 @@
 ## 2025-07-30 13:35:29 -03 - Task 1: Map-Reduce Categorization System  COMPLETED
 
 **Commit:** `ea58849` - feat(categorizer): implement comprehensive LangChain Map-Reduce categorization system  
-**PR:** https://github.com/luanfasolino/langchain_categorizador_conversas/pull/1  
+**PR:** <https://github.com/luanfasolino/langchain_categorizador_conversas/pull/1>  
 **Status:**  All subtasks completed and merged
 
-### <¯ **Implementação Completa - Task 1**
+### <ï¿½ **Implementaï¿½ï¿½o Completa - Task 1**
 
 **Arquivos Modificados:**
 - `src/categorizer.py` (+776 insertions, -177 deletions)
 
-### =Ë **Subtarefas Implementadas:**
+### =ï¿½ **Subtarefas Implementadas:**
 
 ####  **Subtask 1.1: Design Map-Reduce Architecture and Token Management**
-- Implementada arquitetura Map-Reduce com 3 fases (MAP ’ COMBINE ’ CATEGORIZE)
+- Implementada arquitetura Map-Reduce com 3 fases (MAP ï¿½ COMBINE ï¿½ CATEGORIZE)
 - Sistema de gerenciamento de tokens com RecursiveCharacterTextSplitter + tiktoken
-- Chunks otimizados: 100K tokens com overlap de 20K para precisão semântica
-- Integração com Context7 best practices para LangChain moderno
+- Chunks otimizados: 100K tokens com overlap de 20K para precisï¿½o semï¿½ntica
+- Integraï¿½ï¿½o com Context7 best practices para LangChain moderno
 
 ####  **Subtask 1.2: Implement Parallel Processing with ThreadPoolExecutor**
 - ThreadPoolExecutor configurado com `max_workers=min(cpu_count, 4)`
 - Processamento paralelo de chunks e batches com thread safety
-- Monitoramento de performance em tempo real com métricas detalhadas
+- Monitoramento de performance em tempo real com mï¿½tricas detalhadas
 - Graceful shutdown e error recovery para workers
 
 ####  **Subtask 1.3: Integrate Gemini 2.5 Flash Model with Optimal Configuration**
-- Configuração otimizada: temperature=0.3, top_p=0.8, top_k=40
-- Templates LCEL otimizados para categorização consistente
-- Safety settings configurados para máxima flexibilidade
-- Validação de respostas JSON com error handling robusto
+- Configuraï¿½ï¿½o otimizada: temperature=0.3, top_p=0.8, top_k=40
+- Templates LCEL otimizados para categorizaï¿½ï¿½o consistente
+- Safety settings configurados para mï¿½xima flexibilidade
+- Validaï¿½ï¿½o de respostas JSON com error handling robusto
 
 ####  **Subtask 1.4: Implement Comprehensive Error Handling and Retry Logic**
 - Sistema de retry com exponential backoff (base=1s, max=60s)
-- Classificação inteligente de erros (RATE_LIMIT, TIMEOUT, CONNECTION, etc.)
-- Jitter aleatório para evitar thundering herd
+- Classificaï¿½ï¿½o inteligente de erros (RATE_LIMIT, TIMEOUT, CONNECTION, etc.)
+- Jitter aleatï¿½rio para evitar thundering herd
 - Logs detalhados com contexto completo para debugging
 
 ####  **Subtask 1.5: Implement Token Usage Tracking and Cost Estimation**
 - Tracking preciso por fase com pricing Gemini 2.5 Flash ($0.125/1K input, $0.375/1K output)
-- Projeções de budget com cenários conservador/realista/pessimista
-- Relatórios abrangentes com métricas de performance (tokens/segundo, custo/eficiência)
-- Alertas automáticos de budget e recomendações de otimização
+- Projeï¿½ï¿½es de budget com cenï¿½rios conservador/realista/pessimista
+- Relatï¿½rios abrangentes com mï¿½tricas de performance (tokens/segundo, custo/eficiï¿½ncia)
+- Alertas automï¿½ticos de budget e recomendaï¿½ï¿½es de otimizaï¿½ï¿½o
 
-### =€ **Funcionalidades Principais:**
+### =ï¿½ **Funcionalidades Principais:**
 
 **Map-Reduce Pipeline:**
-- Fase MAP: Análise paralela de chunks com metadata tracking
-- Fase COMBINE: Consolidação de análises parciais em visão unificada
-- Fase CATEGORIZE: Aplicação de categorias com validação JSON
+- Fase MAP: Anï¿½lise paralela de chunks com metadata tracking
+- Fase COMBINE: Consolidaï¿½ï¿½o de anï¿½lises parciais em visï¿½o unificada
+- Fase CATEGORIZE: Aplicaï¿½ï¿½o de categorias com validaï¿½ï¿½o JSON
 
 **Performance & Reliability:**
-- Processamento de 1000+ tickets com transparência de custos
+- Processamento de 1000+ tickets com transparï¿½ncia de custos
 - Cache inteligente com SHA-256 hash keys
-- Error handling graceful com retry automático
+- Error handling graceful com retry automï¿½tico
 - Thread-safe operations em ambiente paralelo
 
 **Cost Management:**
 - Monitoramento de budget em tempo real
-- Projeções precisas baseadas em uso atual
+- Projeï¿½ï¿½es precisas baseadas em uso atual
 - Breakdown detalhado por fase de processamento
-- Recomendações automáticas para otimização
+- Recomendaï¿½ï¿½es automï¿½ticas para otimizaï¿½ï¿½o
 
-### =Ê **Métricas de Qualidade:**
+### =ï¿½ **Mï¿½tricas de Qualidade:**
 
 **Testes Executados:**
--  Validação de sintaxe Python (`py_compile`)
--  Import tests para módulos principais
--  Verificação de estrutura Map-Reduce
--  Teste de integração com Context7 patterns
+-  Validaï¿½ï¿½o de sintaxe Python (`py_compile`)
+-  Import tests para mï¿½dulos principais
+-  Verificaï¿½ï¿½o de estrutura Map-Reduce
+-  Teste de integraï¿½ï¿½o com Context7 patterns
 
 **Code Quality:**
 - Seguiu todas as diretrizes do CHECKLIST.md v2.3
 - Context7 best practices para LangChain moderno
 - Conventional commits format
-- Documentação inline detalhada
+- Documentaï¿½ï¿½o inline detalhada
 
 ### =' **Tecnologias Utilizadas:**
 
@@ -85,7 +85,7 @@
 
 **Processing & Performance:**
 - concurrent.futures.ThreadPoolExecutor
-- pandas para manipulação de DataFrames
+- pandas para manipulaï¿½ï¿½o de DataFrames
 - tqdm para progress bars
 - pickle para cache inteligente
 
@@ -95,28 +95,28 @@
 - Budget monitoring with alerts
 - Performance metrics collection
 
-### <¯ **Próximos Passos:**
+### <ï¿½ **Prï¿½ximos Passos:**
 
-Task Master MCP identificou a próxima tarefa disponível:
+Task Master MCP identificou a prï¿½xima tarefa disponï¿½vel:
 **Task 3: Enhance Data Validation and Filtering** (5 subtarefas)
 
-### =Ý **Notas Técnicas:**
+### =ï¿½ **Notas Tï¿½cnicas:**
 
-**Decisões Arquiteturais:**
-1. **RecursiveCharacterTextSplitter vs TokenTextSplitter**: Escolhido baseado em Context7 recommendations para melhor precisão semântica
+**Decisï¿½es Arquiteturais:**
+1. **RecursiveCharacterTextSplitter vs TokenTextSplitter**: Escolhido baseado em Context7 recommendations para melhor precisï¿½o semï¿½ntica
 2. **LCEL Patterns**: Implementado chains modernas usando pipe operators conforme latest docs
-3. **Error Classification**: Sistema robusto que diferencia erros recuperáveis vs fatais
-4. **Cost Tracking**: Implementado tracking granular por fase para otimização precisa
+3. **Error Classification**: Sistema robusto que diferencia erros recuperï¿½veis vs fatais
+4. **Cost Tracking**: Implementado tracking granular por fase para otimizaï¿½ï¿½o precisa
 
 **Descobertas Importantes:**
-- Context7 forneceu documentação mais atualizada que conhecimento base da LLM
-- LCEL patterns são mais eficientes que chains tradicionais
-- Token tracking por fase permite otimização direcionada
+- Context7 forneceu documentaï¿½ï¿½o mais atualizada que conhecimento base da LLM
+- LCEL patterns sï¿½o mais eficientes que chains tradicionais
+- Token tracking por fase permite otimizaï¿½ï¿½o direcionada
 - Exponential backoff com jitter elimina thundering herd em ambiente paralelo
 
 **Research Links:**
 - Consultado Context7 sobre LangChain Map-Reduce patterns
 - Verificado APIs mais recentes do Google Gemini via Context7
-- Validado melhores práticas para processamento paralelo
+- Validado melhores prï¿½ticas para processamento paralelo
 
 ---
