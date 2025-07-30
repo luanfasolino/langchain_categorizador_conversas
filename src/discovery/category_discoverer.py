@@ -661,19 +661,81 @@ def merge_categories(
     categories1: Dict[str, Any], categories2: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    Merge two category dictionaries.
+    Merge two category dictionaries intelligently.
 
     Args:
-        categories1: First categories dict
-        categories2: Second categories dict
+        categories1: First categories dict with 'categories' list
+        categories2: Second categories dict with 'categories' list
 
     Returns:
-        Merged categories dict
+        Merged categories dict with combined categories and updated metadata
     """
-    # Implementation for merging categories
-    # This is a placeholder - would need sophisticated logic to handle conflicts
-    # TODO: Implement merging logic
-    pass
+    if not categories1 or not categories2:
+        return categories1 or categories2 or {}
+
+    # Validate inputs have required structure
+    if "categories" not in categories1 or "categories" not in categories2:
+        raise ValueError("Both category dicts must have 'categories' key")
+
+    # Start with categories1 as base
+    merged = categories1.copy()
+
+    # Get existing categories and create lookup by technical_name
+    existing_cats = {cat.get("technical_name"): cat for cat in merged["categories"]}
+    max_id = max([cat.get("id", 0) for cat in merged["categories"]], default=0)
+
+    # Merge categories from categories2
+    new_categories_added = 0
+    categories_updated = 0
+
+    for cat2 in categories2["categories"]:
+        tech_name = cat2.get("technical_name")
+
+        if tech_name in existing_cats:
+            # Category exists - merge keywords and examples
+            existing_cat = existing_cats[tech_name]
+
+            # Merge keywords
+            existing_keywords = set(existing_cat.get("keywords", []))
+            new_keywords = set(cat2.get("keywords", []))
+            existing_cat["keywords"] = list(existing_keywords | new_keywords)
+
+            # Merge examples
+            existing_examples = set(existing_cat.get("examples", []))
+            new_examples = set(cat2.get("examples", []))
+            existing_cat["examples"] = list(existing_examples | new_examples)
+
+            # Update description if cat2 has more detail
+            if len(cat2.get("description", "")) > len(
+                existing_cat.get("description", "")
+            ):
+                existing_cat["description"] = cat2["description"]
+
+            categories_updated += 1
+        else:
+            # New category - add with new ID
+            new_cat = cat2.copy()
+            max_id += 1
+            new_cat["id"] = max_id
+            merged["categories"].append(new_cat)
+            new_categories_added += 1
+
+    # Update metadata
+    merged["discovery_stats"] = merged.get("discovery_stats", {})
+    merged["discovery_stats"]["categories_created"] = len(merged["categories"])
+    merged["discovery_stats"]["merge_info"] = {
+        "new_categories_added": new_categories_added,
+        "categories_updated": categories_updated,
+        "total_merged_from": len(categories2["categories"]),
+    }
+
+    # Update timestamps
+    from datetime import datetime
+
+    merged["generated_at"] = datetime.now().isoformat()
+    merged["version"] = merged.get("version", "1.0")
+
+    return merged
 
 
 def validate_categories_schema(categories: Dict[str, Any]) -> bool:

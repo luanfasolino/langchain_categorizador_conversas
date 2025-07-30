@@ -725,12 +725,85 @@ def validate_classification_accuracy(
     Validate classification accuracy against ground truth.
 
     Args:
-        results_df: Classification results
-        ground_truth_df: Ground truth classifications
+        results_df: Classification results with columns: ticket_id, category_ids
+        ground_truth_df: Ground truth with columns: ticket_id, category_ids
 
     Returns:
-        Accuracy metrics
+        Accuracy metrics dictionary
     """
-    # Implementation for accuracy validation
-    # This would compare predicted vs actual categories
-    pass
+    if results_df.empty or ground_truth_df.empty:
+        return {"error": "Empty DataFrames provided"}
+
+    # Merge on ticket_id to align predictions with ground truth
+    merged = pd.merge(
+        results_df[["ticket_id", "category_ids"]],
+        ground_truth_df[["ticket_id", "category_ids"]],
+        on="ticket_id",
+        suffixes=("_pred", "_true"),
+    )
+
+    if merged.empty:
+        return {"error": "No matching ticket_ids between results and ground truth"}
+
+    total_tickets = len(merged)
+    exact_matches = 0
+    partial_matches = 0
+    precision_scores = []
+    recall_scores = []
+
+    for _, row in merged.iterrows():
+        # Parse category lists
+        pred_cats = (
+            set(str(row["category_ids_pred"]).split(","))
+            if pd.notna(row["category_ids_pred"])
+            else set()
+        )
+        true_cats = (
+            set(str(row["category_ids_true"]).split(","))
+            if pd.notna(row["category_ids_true"])
+            else set()
+        )
+
+        # Remove empty strings
+        pred_cats = {c.strip() for c in pred_cats if c.strip()}
+        true_cats = {c.strip() for c in true_cats if c.strip()}
+
+        # Calculate metrics
+        if pred_cats == true_cats:
+            exact_matches += 1
+
+        intersection = pred_cats & true_cats
+        if intersection:
+            partial_matches += 1
+
+        # Precision: correct predictions / total predictions
+        precision = len(intersection) / len(pred_cats) if pred_cats else 0.0
+        precision_scores.append(precision)
+
+        # Recall: correct predictions / total ground truth
+        recall = len(intersection) / len(true_cats) if true_cats else 0.0
+        recall_scores.append(recall)
+
+    # Calculate overall metrics
+    exact_accuracy = exact_matches / total_tickets
+    partial_accuracy = partial_matches / total_tickets
+    avg_precision = (
+        sum(precision_scores) / len(precision_scores) if precision_scores else 0.0
+    )
+    avg_recall = sum(recall_scores) / len(recall_scores) if recall_scores else 0.0
+    f1_score = (
+        2 * (avg_precision * avg_recall) / (avg_precision + avg_recall)
+        if (avg_precision + avg_recall) > 0
+        else 0.0
+    )
+
+    return {
+        "total_tickets": total_tickets,
+        "exact_accuracy": round(exact_accuracy, 4),
+        "partial_accuracy": round(partial_accuracy, 4),
+        "average_precision": round(avg_precision, 4),
+        "average_recall": round(avg_recall, 4),
+        "f1_score": round(f1_score, 4),
+        "exact_matches": exact_matches,
+        "partial_matches": partial_matches,
+    }
