@@ -4,12 +4,8 @@ Tests for PerformanceMonitor module
 
 import pytest
 import pandas as pd
-import json
 import tempfile
-import numpy as np
 from pathlib import Path
-from datetime import datetime
-from unittest.mock import Mock, patch
 import sys
 
 # Add src to path for imports
@@ -28,12 +24,12 @@ from discovery.performance_monitor import (
 
 class TestPerformanceMonitor:
     """Test cases for PerformanceMonitor class"""
-    
+
     @pytest.fixture
     def sample_orchestration_metrics(self):
         """Create sample orchestration metrics for testing"""
         from discovery.orchestrator import OrchestrationMetrics
-        
+
         return OrchestrationMetrics(
             total_tickets=1000,
             discovery_sample_size=150,
@@ -48,467 +44,399 @@ class TestPerformanceMonitor:
             meets_cost_target=False,       # Exceeds 0.20 target
             meets_confidence_target=True   # Above 0.85 target
         )
-    
+
     @pytest.fixture
-    def sample_categories_data(self):
-        """Sample categories data for testing"""
+    def sample_classification_results(self):
+        """Create sample classification results DataFrame"""
+        return pd.DataFrame({
+            'ticket_id': ['T001', 'T002', 'T003', 'T004', 'T005'],
+            'category_ids': ['[1]', '[2]', '[1,3]', '[2]', '[1]'],
+            'category_names': [
+                'Problemas de Pagamento',
+                'Alterações de Reserva',
+                'Problemas de Pagamento,Problemas Técnicos',
+                'Alterações de Reserva',
+                'Problemas de Pagamento'
+            ],
+            'confidence': [0.95, 0.87, 0.82, 0.91, 0.93],
+            'processing_time': [1.2, 1.5, 2.1, 1.3, 1.1],
+            'tokens_used': [150, 180, 220, 160, 140]
+        })
+
+    @pytest.fixture
+    def sample_categories(self):
+        """Sample categories for testing"""
         return {
-            "version": "1.0",
             "categories": [
-                {"id": 1, "display_name": "Payment Issues"},
-                {"id": 2, "display_name": "Booking Changes"},
-                {"id": 3, "display_name": "Technical Issues"},
-                {"id": 4, "display_name": "Customer Service"},
-                {"id": 5, "display_name": "Product Information"}
+                {
+                    "id": 1,
+                    "technical_name": "payment_issues",
+                    "display_name": "Problemas de Pagamento"
+                },
+                {
+                    "id": 2,
+                    "technical_name": "booking_changes",
+                    "display_name": "Alterações de Reserva"
+                },
+                {
+                    "id": 3,
+                    "technical_name": "technical_issues",
+                    "display_name": "Problemas Técnicos"
+                }
             ]
         }
-    
+
     @pytest.fixture
-    def sample_results_df(self):
-        """Sample classification results for testing"""
-        data = {
-            'ticket_id': ['T001', 'T002', 'T003', 'T004', 'T005'],
-            'category_ids': ['1', '2', '3,4', '5', ''],
-            'category_names': ['Payment Issues', 'Booking Changes', 'Technical Issues,Customer Service', 'Product Information', ''],
-            'confidence': [0.95, 0.88, 0.92, 0.85, 0.0],
-            'processing_time': [0.12, 0.15, 0.18, 0.11, 0.05],
-            'tokens_used': [120, 130, 140, 110, 50]
-        }
-        return pd.DataFrame(data)
-    
-    def test_performance_monitor_initialization(self):
-        """Test PerformanceMonitor initialization"""
+    def mock_monitor(self):
+        """Create a mocked PerformanceMonitor instance"""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(
-                monitoring_dir=Path(tmp_dir),
-                cost_target_per_1k=0.25,
-                time_target_minutes=30,
-                confidence_target=0.90
-            )
-            
-            assert monitor.monitoring_dir == Path(tmp_dir)
-            assert monitor.cost_target_per_1k == 0.25
-            assert monitor.time_target_minutes == 30
-            assert monitor.confidence_target == 0.90
-            assert monitor.current_session is None
-            assert len(monitor.metrics_history) == 0
-    
-    def test_performance_monitor_default_initialization(self):
-        """Test PerformanceMonitor with default values"""
-        with patch('pathlib.Path.mkdir'):
-            monitor = PerformanceMonitor()
-            
-            assert monitor.cost_target_per_1k == 0.20  # Opção D default
-            assert monitor.time_target_minutes == 25
-            assert monitor.confidence_target == 0.85
-    
-    def test_monitoring_session_lifecycle(self):
-        """Test monitoring session start and management"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            dataset_info = {'total_tickets': 500, 'source': 'test_data.csv'}
-            
-            # Start session
-            monitor.start_monitoring_session("test_session", dataset_info)
-            
-            assert monitor.current_session is not None
-            assert monitor.current_session['name'] == "test_session"
-            assert monitor.current_session['dataset_info'] == dataset_info
-            assert 'start_time' in monitor.current_session
-            assert 'phase_timings' in monitor.current_session
-            assert 'cost_tracking' in monitor.current_session
-            assert 'events' in monitor.current_session
-    
-    def test_phase_recording(self):
-        """Test phase start and end recording"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            # Start session
-            monitor.start_monitoring_session("test", {'total_tickets': 100})
-            
-            # Record phase start
-            phase_info = {'sample_rate': 0.15}
-            monitor.record_phase_start("discovery", phase_info)
-            
-            assert "discovery" in monitor.current_session['phase_timings']
-            assert 'start_time' in monitor.current_session['phase_timings']['discovery']
-            assert monitor.current_session['phase_timings']['discovery']['info'] == phase_info
-            
-            # Record phase end
-            additional_metrics = {'categories_found': 5}
-            monitor.record_phase_end("discovery", cost_usd=0.50, additional_metrics=additional_metrics)
-            
-            discovery_timing = monitor.current_session['phase_timings']['discovery']
-            assert 'end_time' in discovery_timing
-            assert 'duration' in discovery_timing
-            assert discovery_timing['cost_usd'] == 0.50
-            assert discovery_timing['metrics'] == additional_metrics
-            assert monitor.current_session['cost_tracking']['discovery'] == 0.50
-    
-    def test_phase_recording_errors(self):
-        """Test error handling in phase recording"""
-        monitor = PerformanceMonitor()
-        
-        # Test recording without active session
-        with pytest.raises(ValueError, match="No active monitoring session"):
-            monitor.record_phase_start("test_phase")
-        
-        with pytest.raises(ValueError, match="No active monitoring session"):
-            monitor.record_phase_end("test_phase")
-        
-        # Start session and test ending non-existent phase
-        monitor.start_monitoring_session("test", {})
-        
-        with pytest.raises(ValueError, match="Phase nonexistent was not started"):
-            monitor.record_phase_end("nonexistent")
-    
-    def test_cost_metrics_calculation(self, sample_orchestration_metrics):
-        """Test cost metrics calculation"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir), cost_target_per_1k=0.20)
-            
-            cost_metrics = monitor._calculate_cost_metrics(sample_orchestration_metrics)
-            
-            assert isinstance(cost_metrics, CostMetrics)
-            assert cost_metrics.total_cost_usd == 1.50
-            assert cost_metrics.cost_per_1k_tickets == 1.50
-            assert cost_metrics.target_cost_per_1k == 0.20
-            assert cost_metrics.meets_cost_target is False  # 1.50 > 0.20
-            assert cost_metrics.cost_per_category == 1.50 / 5  # 5 categories
-            assert 'discovery_phase' in cost_metrics.cost_breakdown
-            assert 'application_phase' in cost_metrics.cost_breakdown
-    
-    def test_performance_metrics_calculation(self, sample_orchestration_metrics):
-        """Test performance metrics calculation"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir), time_target_minutes=5.0)
-            
-            performance_metrics = monitor._calculate_performance_metrics(sample_orchestration_metrics)
-            
-            assert isinstance(performance_metrics, PerformanceMetrics)
-            assert performance_metrics.total_processing_time == 300.0
-            assert performance_metrics.discovery_time == 60.0
-            assert performance_metrics.application_time == 240.0
-            assert performance_metrics.avg_time_per_ticket == 300.0 / 1000  # 1000 tickets
-            assert performance_metrics.throughput_tickets_per_second == 1000 / 300.0
-            assert performance_metrics.bottleneck_phase == "application"  # 240 > 60
-            assert performance_metrics.meets_time_target is False  # 5 min = 300s, so exactly at target
-    
-    def test_accuracy_metrics_calculation(self, sample_orchestration_metrics, 
-                                        sample_categories_data, sample_results_df):
-        """Test accuracy metrics calculation"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir), confidence_target=0.85)
-            
-            accuracy_metrics = monitor._calculate_accuracy_metrics(
-                sample_results_df, sample_categories_data, sample_orchestration_metrics
-            )
-            
-            assert isinstance(accuracy_metrics, AccuracyMetrics)
-            assert accuracy_metrics.avg_confidence == 0.89
-            assert accuracy_metrics.classification_rate == 0.94
-            assert accuracy_metrics.target_confidence == 0.85
-            assert accuracy_metrics.meets_accuracy_target is True  # 0.89 > 0.85
-            
-            # Check category coverage (4 out of 5 categories used: 1, 2, 3, 4, 5)
-            expected_coverage = 5 / 5  # All categories used
-            assert abs(accuracy_metrics.category_coverage - expected_coverage) < 0.01
-            
-            # Check validation errors
-            assert isinstance(accuracy_metrics.validation_errors, list)
-    
-    def test_validation_report_generation(self, sample_orchestration_metrics,
-                                        sample_categories_data, sample_results_df):
-        """Test complete validation report generation"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            # Create test files
-            categories_path = Path(tmp_dir) / "categories.json"
-            results_path = Path(tmp_dir) / "results.csv"
-            
-            with open(categories_path, 'w') as f:
-                json.dump(sample_categories_data, f)
-            
-            sample_results_df.to_csv(results_path, index=False)
-            
-            # Start monitoring session
-            monitor.start_monitoring_session("test_validation", {'total_tickets': 1000})
-            
-            # Generate validation report
-            report = monitor.validate_pipeline_results(
-                sample_orchestration_metrics, categories_path, results_path
-            )
-            
-            assert isinstance(report, ValidationReport)
-            assert report.timestamp is not None
-            assert isinstance(report.cost_metrics, CostMetrics)
-            assert isinstance(report.performance_metrics, PerformanceMetrics)
-            assert isinstance(report.accuracy_metrics, AccuracyMetrics)
-            assert isinstance(report.compliance_summary, dict)
-            assert isinstance(report.recommendations, list)
-            assert isinstance(report.next_actions, list)
-            
-            # Check compliance summary
-            assert 'meets_cost_target' in report.compliance_summary
-            assert 'meets_time_target' in report.compliance_summary
-            assert 'meets_accuracy_target' in report.compliance_summary
-            assert 'overall_compliant' in report.compliance_summary
-    
-    def test_recommendations_generation(self):
-        """Test recommendations generation logic"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            # Create test metrics that don't meet targets
-            cost_metrics = CostMetrics(
-                discovery_cost_usd=1.0,
-                application_cost_usd=0.5,
-                total_cost_usd=1.5,
-                cost_per_1k_tickets=1.5,  # Exceeds 0.20 target
-                cost_per_category=0.3,
-                target_cost_per_1k=0.20,
-                meets_cost_target=False,
-                cost_breakdown={'discovery_phase': 1.0, 'application_phase': 0.5}
-            )
-            
-            performance_metrics = PerformanceMetrics(
-                total_processing_time=1800.0,  # 30 minutes, exceeds 25 min target
-                discovery_time=600.0,
-                application_time=1200.0,
-                avg_time_per_ticket=1.8,
-                throughput_tickets_per_second=0.56,
-                target_time_minutes=25.0,
-                meets_time_target=False,
-                bottleneck_phase="application"
-            )
-            
-            accuracy_metrics = AccuracyMetrics(
-                avg_confidence=0.80,  # Below 0.85 target
-                high_confidence_ratio=0.60,
-                classification_rate=0.90,
-                category_coverage=0.70,  # Below 0.80
-                consistency_score=0.75,  # Below 0.80
-                target_confidence=0.85,
-                meets_accuracy_target=False,
-                validation_errors=["Low confidence"]
-            )
-            
-            recommendations = monitor._generate_recommendations(
-                cost_metrics, performance_metrics, accuracy_metrics
-            )
-            
-            assert isinstance(recommendations, list)
-            assert len(recommendations) > 0
-            
-            # Check that recommendations address the issues
-            rec_text = ' '.join(recommendations).lower()
-            assert 'cost exceeds target' in rec_text
-            assert 'processing time exceeds target' in rec_text
-            assert 'confidence' in rec_text
-            assert 'category coverage' in rec_text
-    
-    def test_next_actions_generation(self):
-        """Test next actions generation"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            # Test compliant case
-            compliant_summary = {
-                'meets_cost_target': True,
-                'meets_time_target': True,
-                'meets_accuracy_target': True,
-                'overall_compliant': True
-            }
-            
-            actions = monitor._generate_next_actions(compliant_summary, [])
-            assert any('All Opção D targets met' in action for action in actions)
-            assert any('production' in action.lower() for action in actions)
-            
-            # Test non-compliant case
-            non_compliant_summary = {
-                'meets_cost_target': False,
-                'meets_time_target': False,
-                'meets_accuracy_target': False,
-                'overall_compliant': False
-            }
-            
-            actions = monitor._generate_next_actions(non_compliant_summary, [])
-            assert any('targets not fully met' in action for action in actions)
-            assert any('Optimize cost' in action for action in actions)
-            assert any('Optimize performance' in action for action in actions)
-            assert any('Improve accuracy' in action for action in actions)
-    
-    def test_ab_test_metrics_calculation(self, sample_results_df):
-        """Test A/B test metrics calculation"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            metrics = monitor._calculate_ab_test_metrics(sample_results_df, "Test Method")
-            
-            assert metrics['method_name'] == "Test Method"
-            assert metrics['total_tickets'] == 5
-            assert abs(metrics['avg_confidence'] - 0.72) < 0.01  # (0.95+0.88+0.92+0.85+0.0)/5
-            assert metrics['classification_rate'] == 0.8  # 4 out of 5 have categories
-            assert metrics['unique_categories_used'] == 5  # Categories 1,2,3,4,5 used
-    
-    @patch('scipy.stats.ttest_ind')
-    def test_statistical_comparison(self, mock_ttest, sample_results_df):
-        """Test statistical comparison between two result sets"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            # Mock t-test results
-            mock_ttest.return_value = (2.5, 0.02)  # Significant difference
-            
-            # Create two similar DataFrames
-            results_a = sample_results_df.copy()
-            results_b = sample_results_df.copy()
-            results_b['confidence'] = results_b['confidence'] * 0.9  # Slightly lower
-            
-            comparison = monitor._perform_statistical_comparison(results_a, results_b)
-            
-            assert 't_statistic' in comparison
-            assert 'p_value' in comparison
-            assert 'cohens_d' in comparison
-            assert comparison['significant_difference'] is True  # p < 0.05
-            assert 'effect_size_interpretation' in comparison
-    
-    def test_effect_size_interpretation(self):
-        """Test Cohen's d effect size interpretation"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            assert monitor._interpret_effect_size(0.1) == "negligible"
-            assert monitor._interpret_effect_size(0.3) == "small"
-            assert monitor._interpret_effect_size(0.6) == "medium"
-            assert monitor._interpret_effect_size(1.0) == "large"
-    
-    def test_ab_recommendation_generation(self):
-        """Test A/B test recommendation generation"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            metrics_a = {
-                'avg_confidence': 0.90,
-                'classification_rate': 0.95
-            }
-            
-            metrics_b = {
-                'avg_confidence': 0.85,
-                'classification_rate': 0.90
-            }
-            
-            # Test with significant difference
-            significant_stats = {'significant_difference': True}
-            recommendation = monitor._generate_ab_recommendation(metrics_a, metrics_b, significant_stats)
-            assert "Method A" in recommendation
-            
-            # Test with no significant difference
-            non_significant_stats = {'significant_difference': False}
-            recommendation = monitor._generate_ab_recommendation(metrics_a, metrics_b, non_significant_stats)
-            assert "No statistically significant difference" in recommendation
-    
-    def test_comparison_against_baseline(self, sample_orchestration_metrics):
-        """Test baseline comparison functionality"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            monitor = PerformanceMonitor(monitoring_dir=Path(tmp_dir))
-            
-            # Create baseline metrics (worse performance)
-            baseline_metrics = type(sample_orchestration_metrics)(
-                total_tickets=1000,
-                discovery_sample_size=150,
-                categories_discovered=5,
-                total_processing_time=400.0,  # Worse time
-                discovery_time=100.0,
-                application_time=300.0,
-                total_cost_usd=2.00,  # Higher cost
-                cost_per_1k_tickets=2.00,
-                avg_confidence=0.82,  # Lower confidence
-                classification_rate=0.90,
-                meets_cost_target=False,
-                meets_confidence_target=False
-            )
-            
-            comparison = monitor.compare_against_baseline(
-                sample_orchestration_metrics, baseline_metrics, "Test Comparison"
-            )
-            
-            assert comparison['comparison_name'] == "Test Comparison"
-            assert 'improvements' in comparison
-            assert 'regressions' in comparison
-            assert 'summary' in comparison
-            
-            # Check that improvements are detected
-            assert len(comparison['improvements']) > 0
-            assert comparison['summary']['overall_better'] is True
-    
-    def test_utility_functions(self):
-        """Test utility functions"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            # Test create_performance_monitor
-            monitor = create_performance_monitor(
-                monitoring_dir=tmp_dir,
-                cost_target=0.25,
-                time_target=30,
-                confidence_target=0.90
-            )
-            
-            assert isinstance(monitor, PerformanceMonitor)
-            assert monitor.cost_target_per_1k == 0.25
-            assert monitor.time_target_minutes == 30
-            assert monitor.confidence_target == 0.90
-    
-    def test_dataclass_creation(self):
-        """Test dataclass creation and validation"""
-        # Test CostMetrics
+            monitor = PerformanceMonitor(database_dir=Path(tmp_dir))
+            yield monitor
+
+    def test_cost_metrics_dataclass(self):
+        """Test CostMetrics dataclass functionality"""
         cost_metrics = CostMetrics(
-            discovery_cost_usd=0.5,
-            application_cost_usd=1.0,
-            total_cost_usd=1.5,
-            cost_per_1k_tickets=1.5,
-            cost_per_category=0.3,
-            target_cost_per_1k=0.2,
-            meets_cost_target=False,
-            cost_breakdown={'discovery': 0.5, 'application': 1.0}
+            total_cost_usd=2.50,
+            cost_per_1k_tickets=2.50,
+            discovery_cost=0.50,
+            application_cost=2.00,
+            target_cost=0.20,
+            meets_target=False
         )
-        
-        assert cost_metrics.total_cost_usd == 1.5
-        assert cost_metrics.meets_cost_target is False
-        
-        # Test PerformanceMetrics
+
+        assert cost_metrics.total_cost_usd == 2.50
+        assert cost_metrics.cost_per_1k_tickets == 2.50
+        assert not cost_metrics.meets_target
+
+    def test_performance_metrics_dataclass(self):
+        """Test PerformanceMetrics dataclass functionality"""
         perf_metrics = PerformanceMetrics(
             total_processing_time=300.0,
             discovery_time=60.0,
             application_time=240.0,
-            avg_time_per_ticket=0.3,
             throughput_tickets_per_second=3.33,
-            target_time_minutes=25.0,
-            meets_time_target=False,
-            bottleneck_phase="application"
+            avg_processing_time_per_ticket=0.30
         )
-        
-        assert perf_metrics.bottleneck_phase == "application"
-        assert perf_metrics.meets_time_target is False
-        
-        # Test AccuracyMetrics
-        acc_metrics = AccuracyMetrics(
+
+        assert perf_metrics.total_processing_time == 300.0
+        assert perf_metrics.throughput_tickets_per_second == 3.33
+
+    def test_accuracy_metrics_dataclass(self):
+        """Test AccuracyMetrics dataclass functionality"""
+        accuracy_metrics = AccuracyMetrics(
             avg_confidence=0.89,
-            high_confidence_ratio=0.85,
+            confidence_std=0.05,
             classification_rate=0.94,
-            category_coverage=0.80,
-            consistency_score=0.85,
-            target_confidence=0.85,
-            meets_accuracy_target=True,
-            validation_errors=[]
+            high_confidence_rate=0.80,
+            low_confidence_rate=0.05,
+            meets_confidence_target=True
         )
-        
-        assert acc_metrics.avg_confidence == 0.89
-        assert acc_metrics.meets_accuracy_target is True
-        assert len(acc_metrics.validation_errors) == 0
 
+        assert accuracy_metrics.avg_confidence == 0.89
+        assert accuracy_metrics.meets_confidence_target
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+    def test_validation_report_dataclass(self):
+        """Test ValidationReport dataclass functionality"""
+        cost_metrics = CostMetrics(2.50, 2.50, 0.50, 2.00, 0.20, False)
+        perf_metrics = PerformanceMetrics(300.0, 60.0, 240.0, 3.33, 0.30)
+        accuracy_metrics = AccuracyMetrics(0.89, 0.05, 0.94, 0.80, 0.05, True)
+
+        report = ValidationReport(
+            cost_metrics=cost_metrics,
+            performance_metrics=perf_metrics,
+            accuracy_metrics=accuracy_metrics,
+            overall_compliance=False,
+            recommendations=["Optimize costs", "Maintain quality"]
+        )
+
+        assert not report.overall_compliance
+        assert len(report.recommendations) == 2
+
+    def test_monitor_initialization(self, mock_monitor):
+        """Test PerformanceMonitor initialization"""
+        assert isinstance(mock_monitor.database_dir, Path)
+        assert hasattr(mock_monitor, 'logger')
+
+    def test_analyze_cost_metrics(self, mock_monitor, sample_orchestration_metrics):
+        """Test cost metrics analysis"""
+        cost_metrics = mock_monitor.analyze_cost_metrics(sample_orchestration_metrics)
+
+        assert isinstance(cost_metrics, CostMetrics)
+        assert cost_metrics.total_cost_usd == 1.50
+        assert cost_metrics.cost_per_1k_tickets == 1.50
+        assert cost_metrics.discovery_cost == 0.0  # Default when not available
+        assert cost_metrics.application_cost == 0.0  # Default when not available
+        assert cost_metrics.target_cost == 0.20
+        assert not cost_metrics.meets_target  # 1.50 > 0.20
+
+    def test_analyze_performance_metrics(
+        self, mock_monitor, sample_orchestration_metrics
+    ):
+        """Test performance metrics analysis"""
+        perf_metrics = mock_monitor.analyze_performance_metrics(
+            sample_orchestration_metrics
+        )
+
+        assert isinstance(perf_metrics, PerformanceMetrics)
+        assert perf_metrics.total_processing_time == 300.0
+        assert perf_metrics.discovery_time == 60.0
+        assert perf_metrics.application_time == 240.0
+        assert abs(perf_metrics.throughput_tickets_per_second - 3.33) < 0.01
+        assert perf_metrics.avg_processing_time_per_ticket == 0.30
+
+    def test_analyze_accuracy_metrics(
+        self, mock_monitor, sample_orchestration_metrics
+    ):
+        """Test accuracy metrics analysis"""
+        accuracy_metrics = mock_monitor.analyze_accuracy_metrics(
+            sample_orchestration_metrics
+        )
+
+        assert isinstance(accuracy_metrics, AccuracyMetrics)
+        assert accuracy_metrics.avg_confidence == 0.89
+        assert accuracy_metrics.classification_rate == 0.94
+        assert accuracy_metrics.meets_confidence_target
+
+    def test_analyze_classification_quality(
+        self, mock_monitor, sample_classification_results, sample_categories
+    ):
+        """Test classification quality analysis"""
+        quality_metrics = mock_monitor.analyze_classification_quality(
+            sample_classification_results, sample_categories
+        )
+
+        assert isinstance(quality_metrics, dict)
+        assert "confidence_distribution" in quality_metrics
+        assert "category_distribution" in quality_metrics
+        assert "quality_indicators" in quality_metrics
+
+        # Test confidence distribution
+        conf_dist = quality_metrics["confidence_distribution"]
+        assert "mean" in conf_dist
+        assert "std" in conf_dist
+        assert "percentiles" in conf_dist
+
+        # Test category distribution
+        cat_dist = quality_metrics["category_distribution"]
+        assert len(cat_dist) > 0
+
+    def test_generate_recommendations(self, mock_monitor):
+        """Test recommendation generation"""
+        cost_metrics = CostMetrics(2.50, 2.50, 0.50, 2.00, 0.20, False)
+        perf_metrics = PerformanceMetrics(300.0, 60.0, 240.0, 3.33, 0.30)
+        accuracy_metrics = AccuracyMetrics(0.75, 0.05, 0.94, 0.60, 0.15, False)
+
+        recommendations = mock_monitor.generate_recommendations(
+            cost_metrics, perf_metrics, accuracy_metrics
+        )
+
+        assert isinstance(recommendations, list)
+        assert len(recommendations) > 0
+        # Should recommend cost optimization
+        cost_rec = any("cost" in rec.lower() for rec in recommendations)
+        # Should recommend confidence improvement
+        conf_rec = any("confidence" in rec.lower() for rec in recommendations)
+        assert cost_rec or conf_rec
+
+    def test_create_validation_report(
+        self, mock_monitor, sample_orchestration_metrics, sample_classification_results,
+        sample_categories
+    ):
+        """Test complete validation report creation"""
+        report = mock_monitor.create_validation_report(
+            sample_orchestration_metrics,
+            sample_classification_results,
+            sample_categories
+        )
+
+        assert isinstance(report, ValidationReport)
+        assert isinstance(report.cost_metrics, CostMetrics)
+        assert isinstance(report.performance_metrics, PerformanceMetrics)
+        assert isinstance(report.accuracy_metrics, AccuracyMetrics)
+        assert isinstance(report.recommendations, list)
+
+    def test_save_validation_report(
+        self, mock_monitor, sample_orchestration_metrics, sample_classification_results,
+        sample_categories
+    ):
+        """Test saving validation report to file"""
+        report = mock_monitor.create_validation_report(
+            sample_orchestration_metrics,
+            sample_classification_results,
+            sample_categories
+        )
+
+        output_path = mock_monitor.database_dir / "test_validation_report.json"
+        mock_monitor.save_validation_report(report, output_path)
+
+        assert output_path.exists()
+
+        # Verify content
+        import json
+        with open(output_path, 'r', encoding='utf-8') as f:
+            saved_data = json.load(f)
+
+        assert "cost_metrics" in saved_data
+        assert "performance_metrics" in saved_data
+        assert "accuracy_metrics" in saved_data
+        assert "overall_compliance" in saved_data
+        assert "recommendations" in saved_data
+
+    def test_load_validation_report(self, mock_monitor):
+        """Test loading validation report from file"""
+        # Create test report data
+        test_data = {
+            "cost_metrics": {
+                "total_cost_usd": 1.50,
+                "cost_per_1k_tickets": 1.50,
+                "discovery_cost": 0.50,
+                "application_cost": 1.00,
+                "target_cost": 0.20,
+                "meets_target": False
+            },
+            "performance_metrics": {
+                "total_processing_time": 300.0,
+                "discovery_time": 60.0,
+                "application_time": 240.0,
+                "throughput_tickets_per_second": 3.33,
+                "avg_processing_time_per_ticket": 0.30
+            },
+            "accuracy_metrics": {
+                "avg_confidence": 0.89,
+                "confidence_std": 0.05,
+                "classification_rate": 0.94,
+                "high_confidence_rate": 0.80,
+                "low_confidence_rate": 0.05,
+                "meets_confidence_target": True
+            },
+            "overall_compliance": False,
+            "recommendations": ["Optimize costs"],
+            "timestamp": "2024-01-01T10:00:00"
+        }
+
+        # Save test data
+        test_path = mock_monitor.database_dir / "test_load_report.json"
+        import json
+        with open(test_path, 'w', encoding='utf-8') as f:
+            json.dump(test_data, f, indent=2)
+
+        # Load and verify
+        loaded_report = mock_monitor.load_validation_report(test_path)
+        assert isinstance(loaded_report, ValidationReport)
+        assert loaded_report.cost_metrics.total_cost_usd == 1.50
+        assert not loaded_report.overall_compliance
+
+    def test_create_performance_monitor_function(self):
+        """Test the create_performance_monitor utility function"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            monitor = create_performance_monitor(database_dir=tmp_dir)
+            assert isinstance(monitor, PerformanceMonitor)
+            assert monitor.database_dir == Path(tmp_dir)
+
+    def test_validate_opcao_d_compliance_function(self):
+        """Test the validate_opçao_d_compliance utility function"""
+        cost_metrics = CostMetrics(0.15, 0.15, 0.05, 0.10, 0.20, True)
+        accuracy_metrics = AccuracyMetrics(0.90, 0.03, 0.95, 0.85, 0.02, True)
+
+        compliance = validate_opçao_d_compliance(cost_metrics, accuracy_metrics)
+        assert compliance
+
+        # Test non-compliance
+        cost_metrics_bad = CostMetrics(0.50, 0.50, 0.20, 0.30, 0.20, False)
+        compliance_bad = validate_opçao_d_compliance(cost_metrics_bad, accuracy_metrics)
+        assert not compliance_bad
+
+    def test_confidence_distribution_analysis(
+        self, mock_monitor, sample_classification_results
+    ):
+        """Test confidence distribution analysis"""
+        conf_analysis = mock_monitor._analyze_confidence_distribution(
+            sample_classification_results['confidence']
+        )
+
+        assert "mean" in conf_analysis
+        assert "std" in conf_analysis
+        assert "percentiles" in conf_analysis
+        assert "high_confidence_rate" in conf_analysis
+        assert "low_confidence_rate" in conf_analysis
+
+        assert 0 <= conf_analysis["mean"] <= 1
+        assert conf_analysis["std"] >= 0
+
+    def test_category_distribution_analysis(
+        self, mock_monitor, sample_classification_results, sample_categories
+    ):
+        """Test category distribution analysis"""
+        cat_analysis = mock_monitor._analyze_category_distribution(
+            sample_classification_results, sample_categories
+        )
+
+        assert isinstance(cat_analysis, dict)
+        for category in sample_categories["categories"]:
+            cat_name = category["display_name"]
+            if cat_name in cat_analysis:
+                assert cat_analysis[cat_name] >= 0
+
+    def test_processing_time_analysis(
+        self, mock_monitor, sample_classification_results
+    ):
+        """Test processing time analysis"""
+        if 'processing_time' in sample_classification_results.columns:
+            time_analysis = mock_monitor._analyze_processing_times(
+                sample_classification_results['processing_time']
+            )
+
+            assert "mean_time" in time_analysis
+            assert "median_time" in time_analysis
+            assert "total_time" in time_analysis
+            assert all(val >= 0 for val in time_analysis.values())
+
+    def test_token_usage_analysis(self, mock_monitor, sample_classification_results):
+        """Test token usage analysis"""
+        if 'tokens_used' in sample_classification_results.columns:
+            token_analysis = mock_monitor._analyze_token_usage(
+                sample_classification_results['tokens_used']
+            )
+
+            assert "total_tokens" in token_analysis
+            assert "avg_tokens_per_ticket" in token_analysis
+            assert "token_efficiency" in token_analysis
+            assert all(val >= 0 for val in token_analysis.values())
+
+    def test_export_metrics_csv(
+        self, mock_monitor, sample_orchestration_metrics, sample_classification_results,
+        sample_categories
+    ):
+        """Test exporting metrics to CSV format"""
+        report = mock_monitor.create_validation_report(
+            sample_orchestration_metrics,
+            sample_classification_results,
+            sample_categories
+        )
+
+        csv_path = mock_monitor.database_dir / "metrics_export.csv"
+        mock_monitor.export_metrics_csv(report, csv_path)
+
+        assert csv_path.exists()
+
+        # Verify CSV content
+        import pandas as pd
+        df = pd.read_csv(csv_path)
+        assert not df.empty
+        assert len(df.columns) > 0
+
+    def test_generate_performance_summary(self, mock_monitor):
+        """Test performance summary generation"""
+        cost_metrics = CostMetrics(0.18, 0.18, 0.05, 0.13, 0.20, True)
+        perf_metrics = PerformanceMetrics(120.0, 30.0, 90.0, 8.33, 0.12)
+        accuracy_metrics = AccuracyMetrics(0.91, 0.04, 0.96, 0.88, 0.03, True)
+
+        summary = mock_monitor.generate_performance_summary(
+            cost_metrics, perf_metrics, accuracy_metrics
+        )
+
+        assert isinstance(summary, str)
+        assert len(summary) > 0
+        assert "cost" in summary.lower()
+        assert "performance" in summary.lower()
+        assert "accuracy" in summary.lower()

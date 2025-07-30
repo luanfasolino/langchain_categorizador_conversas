@@ -1,10 +1,5 @@
 """Testes para o BaseProcessor."""
 
-import pytest
-from unittest.mock import Mock, patch
-from pathlib import Path
-import pandas as pd
-
 from src.base_processor import BaseProcessor
 
 

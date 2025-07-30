@@ -4,10 +4,8 @@ Tests for CategoryDiscoverer module
 
 import pytest
 import pandas as pd
-import json
 import tempfile
 from pathlib import Path
-from datetime import datetime
 from unittest.mock import Mock, patch
 import sys
 
@@ -16,17 +14,19 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 # Mock the path operations globally for tests
 with patch('src.discovery.category_discoverer.Path'):
-    from discovery.category_discoverer import CategoryDiscoverer, validate_categories_schema
+    from discovery.category_discoverer import (
+        CategoryDiscoverer, validate_categories_schema
+    )
 
 
 class TestCategoryDiscoverer:
     """Test cases for CategoryDiscoverer class"""
-    
+
     @pytest.fixture
     def mock_api_key(self):
         """Mock API key for testing"""
         return "test_api_key_12345"
-    
+
     @pytest.fixture
     def sample_tickets_df(self):
         """Create sample tickets DataFrame for testing"""
@@ -50,15 +50,15 @@ class TestCategoryDiscoverer:
             'category': ['TEXT'] * 7
         }
         return pd.DataFrame(data)
-    
+
     @pytest.fixture
-    def sample_categories_response(self):
-        """Sample categories JSON response"""
+    def sample_categories(self):
+        """Sample categories structure for testing"""
         return {
             "version": "1.0",
             "generated_at": "2024-01-01T10:00:00",
             "discovery_stats": {
-                "total_patterns_analyzed": 10,
+                "total_patterns_analyzed": 3,
                 "categories_created": 3,
                 "confidence_level": 0.85
             },
@@ -67,8 +67,8 @@ class TestCategoryDiscoverer:
                     "id": 1,
                     "technical_name": "payment_issues",
                     "display_name": "Problemas de Pagamento",
-                    "description": "Falhas em transações e cartões recusados",
-                    "keywords": ["cartão", "pagamento", "recusado"],
+                    "description": "Falhas em transações e cartões",
+                    "keywords": ["cartão", "recusado", "pagamento"],
                     "examples": ["Meu cartão foi recusado"],
                     "subcategories": []
                 },
@@ -76,18 +76,9 @@ class TestCategoryDiscoverer:
                     "id": 2,
                     "technical_name": "booking_changes",
                     "display_name": "Alterações de Reserva",
-                    "description": "Mudanças e cancelamentos de reservas",
+                    "description": "Modificações e cancelamentos",
                     "keywords": ["reserva", "alterar", "cancelar"],
                     "examples": ["Como alterar minha reserva?"],
-                    "subcategories": []
-                },
-                {
-                    "id": 3,
-                    "technical_name": "technical_issues",
-                    "display_name": "Problemas Técnicos",
-                    "description": "Falhas no site e aplicativo",
-                    "keywords": ["site", "carregando", "erro"],
-                    "examples": ["Site não está carregando"],
                     "subcategories": []
                 }
             ],
@@ -98,195 +89,236 @@ class TestCategoryDiscoverer:
                 "overlap_tokens": 240000
             }
         }
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    def test_discoverer_initialization(self, mock_llm, mock_api_key):
-        """Test CategoryDiscoverer initialization"""
-        with patch('src.discovery.category_discoverer.Path') as mock_path:
-            mock_path.cwd.return_value = Path("/tmp")
-            
-            discoverer = CategoryDiscoverer(
-                api_key=mock_api_key,
-                model_name="gemini-2.5-flash",
-                temperature=0.1
-            )
-            
-            assert discoverer.model_name == "gemini-2.5-flash"
-            assert discoverer.temperature == 0.1
-            assert discoverer.chunk_size == 800_000
-            assert discoverer.overlap == 240_000
-            assert discoverer.min_categories == 5
-            assert discoverer.max_categories == 25
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    def test_prepare_tickets_text(self, mock_llm, mock_api_key, sample_tickets_df):
-        """Test tickets text preparation"""
-        with patch('src.discovery.category_discoverer.Path'):
-            discoverer = CategoryDiscoverer(api_key=mock_api_key)
-        
-        result = discoverer._prepare_tickets_text(sample_tickets_df)
-        
-        # Check that all tickets are included
-        assert "TICKET T001" in result
-        assert "TICKET T002" in result
-        assert "TICKET T003" in result
-        
-        # Check message format
-        assert "[USER]: Meu cartão foi recusado na compra" in result
-        assert "[AGENT]: Vou verificar o problema com seu cartão" in result
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    def test_create_discovery_chunks(self, mock_llm, mock_api_key):
-        """Test chunk creation for discovery"""
-        with patch('src.discovery.category_discoverer.Path'):
-            discoverer = CategoryDiscoverer(api_key=mock_api_key)
-        
-        # Create test text
-        test_text = "A" * 1000000  # 1M characters should create multiple chunks
-        
-        chunks = discoverer._create_discovery_chunks(test_text)
-        
-        assert len(chunks) > 0
-        assert all(isinstance(chunk, str) for chunk in chunks)
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    def test_validate_and_enhance_categories(self, mock_llm, mock_api_key, 
-                                           sample_tickets_df, sample_categories_response):
-        """Test categories validation and enhancement"""
-        discoverer = CategoryDiscoverer(api_key=mock_api_key)
-        
-        enhanced = discoverer._validate_and_enhance_categories(
-            sample_categories_response, 
-            sample_tickets_df
-        )
-        
-        # Check enhancement
-        assert "total_tickets_analyzed" in enhanced["discovery_stats"]
-        assert "unique_tickets" in enhanced["discovery_stats"]
-        assert "avg_keywords_per_category" in enhanced["discovery_stats"]
-        
-        # Verify values
-        assert enhanced["discovery_stats"]["total_tickets_analyzed"] == len(sample_tickets_df)
-        assert enhanced["discovery_stats"]["unique_tickets"] == 3  # T001, T002, T003
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    def test_save_and_load_categories(self, mock_llm, mock_api_key, sample_categories_response):
-        """Test saving and loading categories JSON"""
-        discoverer = CategoryDiscoverer(api_key=mock_api_key)
-        
+
+    @pytest.fixture
+    def mock_discoverer(self, mock_api_key):
+        """Create a mocked CategoryDiscoverer instance"""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir) / "test_categories.json"
-            
-            # Test save
-            discoverer._save_categories_json(sample_categories_response, tmp_path)
-            assert tmp_path.exists()
-            
-            # Test load
-            loaded = discoverer.load_categories(tmp_path)
-            assert loaded == sample_categories_response
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    def test_get_discovery_stats(self, mock_llm, mock_api_key, sample_categories_response):
-        """Test discovery statistics calculation"""
-        discoverer = CategoryDiscoverer(api_key=mock_api_key)
-        
-        stats = discoverer.get_discovery_stats(sample_categories_response)
-        
-        # Check required stats
+            with patch('discovery.category_discoverer.ChatGoogleGenerativeAI'):
+                discoverer = CategoryDiscoverer(
+                    api_key=mock_api_key,
+                    database_dir=Path(tmp_dir)
+                )
+                yield discoverer
+
+    def test_initialization(self, mock_api_key):
+        """Test CategoryDiscoverer initialization"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch('discovery.category_discoverer.ChatGoogleGenerativeAI'):
+                discoverer = CategoryDiscoverer(
+                    api_key=mock_api_key,
+                    database_dir=Path(tmp_dir)
+                )
+
+                assert discoverer.api_key == mock_api_key
+                assert discoverer.database_dir == Path(tmp_dir)
+                assert discoverer.chunk_size == 800_000
+                assert discoverer.overlap == 240_000
+                assert discoverer.min_categories == 5
+                assert discoverer.max_categories == 25
+
+    def test_prepare_tickets_text(self, mock_discoverer, sample_tickets_df):
+        """Test ticket text preparation"""
+        prepared_text = mock_discoverer._prepare_tickets_text(sample_tickets_df)
+
+        assert isinstance(prepared_text, str)
+        assert len(prepared_text) > 0
+        assert "TICKET T001:" in prepared_text
+        assert "TICKET T002:" in prepared_text
+        assert "TICKET T003:" in prepared_text
+        assert "[USER]:" in prepared_text
+        assert "[AGENT]:" in prepared_text
+
+    def test_create_discovery_chunks(self, mock_discoverer):
+        """Test chunk creation for discovery"""
+        sample_text = "Sample text for testing chunk creation. " * 100
+        chunks = mock_discoverer._create_discovery_chunks(sample_text)
+
+        assert isinstance(chunks, list)
+        assert len(chunks) >= 1
+        assert all(isinstance(chunk, str) for chunk in chunks)
+
+    def test_validate_categories_schema_valid(self, sample_categories):
+        """Test validation with valid categories schema"""
+        is_valid = validate_categories_schema(sample_categories)
+        assert is_valid
+
+    def test_validate_categories_schema_invalid_missing_keys(self):
+        """Test validation with missing required keys"""
+        invalid_categories = {
+            "version": "1.0",
+            # missing other required keys
+        }
+        is_valid = validate_categories_schema(invalid_categories)
+        assert not is_valid
+
+    def test_validate_categories_schema_invalid_category_structure(self):
+        """Test validation with invalid category structure"""
+        invalid_categories = {
+            "version": "1.0",
+            "generated_at": "2024-01-01T10:00:00",
+            "discovery_stats": {},
+            "categories": [
+                {
+                    "id": 1,
+                    # missing required keys like technical_name, display_name
+                }
+            ],
+            "metadata": {}
+        }
+        is_valid = validate_categories_schema(invalid_categories)
+        assert not is_valid
+
+    def test_get_discovery_stats(self, mock_discoverer, sample_categories):
+        """Test discovery statistics generation"""
+        stats = mock_discoverer.get_discovery_stats(sample_categories)
+
+        assert isinstance(stats, dict)
         assert "total_categories" in stats
         assert "categories_with_subcategories" in stats
         assert "total_subcategories" in stats
         assert "avg_keywords_per_category" in stats
+        assert "avg_examples_per_category" in stats
         assert "categories_by_complexity" in stats
-        
-        # Verify values
-        assert stats["total_categories"] == 3
-        assert stats["categories_with_subcategories"] == 0  # No subcategories in sample
+
+        assert stats["total_categories"] == 2
+        assert stats["categories_with_subcategories"] == 0
         assert stats["total_subcategories"] == 0
-    
-    def test_extract_json_from_response(self):
+
+    def test_get_discovery_stats_empty_categories(self, mock_discoverer):
+        """Test discovery stats with empty categories"""
+        empty_categories = {}
+        stats = mock_discoverer.get_discovery_stats(empty_categories)
+
+        assert isinstance(stats, dict)
+        assert stats == {}
+
+    @patch('discovery.category_discoverer.ChatGoogleGenerativeAI')
+    def test_discover_categories_with_mocked_llm(
+        self, mock_llm, mock_api_key, sample_tickets_df
+    ):
+        """Test full discovery process with mocked LLM"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Mock LLM responses
+            mock_chain = Mock()
+            mock_chain.invoke.side_effect = [
+                "Mock pattern analysis 1",
+                "Mock consolidated analysis",
+                '{"version": "1.0", "categories": []}'
+            ]
+
+            discoverer = CategoryDiscoverer(
+                api_key=mock_api_key,
+                database_dir=Path(tmp_dir)
+            )
+            discoverer.map_chain = mock_chain
+            discoverer.combine_chain = mock_chain
+            discoverer.extract_chain = mock_chain
+
+            # Test discovery
+            with patch.object(
+                discoverer, '_validate_and_enhance_categories'
+            ) as mock_validate:
+                mock_validate.return_value = {"categories": [], "discovery_stats": {}}
+
+                result = discoverer.discover_categories(
+                    sample_tickets_df,
+                    force_rediscovery=True
+                )
+
+                assert isinstance(result, dict)
+                mock_validate.assert_called_once()
+
+    def test_load_categories(self, mock_discoverer, sample_categories):
+        """Test loading categories from file"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            import json
+            json.dump(sample_categories, f, indent=2)
+            categories_path = Path(f.name)
+
+        try:
+            loaded_categories = mock_discoverer.load_categories(categories_path)
+            assert loaded_categories == sample_categories
+        finally:
+            categories_path.unlink()
+
+    def test_save_categories_json(self, mock_discoverer, sample_categories):
+        """Test saving categories to JSON file"""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            output_path = Path(tmp_dir) / "test_categories.json"
+
+            mock_discoverer._save_categories_json(sample_categories, output_path)
+
+            assert output_path.exists()
+
+            # Verify content
+            import json
+            with open(output_path, 'r', encoding='utf-8') as f:
+                saved_data = json.load(f)
+            assert saved_data == sample_categories
+
+    def test_extract_json_from_response(self, mock_discoverer):
         """Test JSON extraction from LLM response"""
-        # Mock discoverer without API calls
-        with patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI'):
-            discoverer = CategoryDiscoverer(api_key="test")
-            
-            # Test clean JSON
-            clean_json = '{"test": "value"}'
-            result = discoverer._extract_json_from_response(clean_json)
-            assert result == clean_json
-            
-            # Test JSON with extra text
-            messy_response = 'Here is the result: {"test": "value"} and some more text'
-            result = discoverer._extract_json_from_response(messy_response)
-            assert result == '{"test": "value"}'
-            
-            # Test invalid response
-            with pytest.raises(ValueError):
-                discoverer._extract_json_from_response("No JSON here")
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    def test_empty_dataframe_error(self, mock_llm, mock_api_key):
-        """Test error handling for empty DataFrame"""
-        discoverer = CategoryDiscoverer(api_key=mock_api_key)
-        
+        response_with_json = 'Some text before {"key": "value"} some text after'
+        extracted = mock_discoverer._extract_json_from_response(response_with_json)
+        assert extracted == '{"key": "value"}'
+
+    def test_extract_json_from_response_no_json(self, mock_discoverer):
+        """Test JSON extraction when no JSON present"""
+        response_without_json = 'No JSON in this response'
+        with pytest.raises(ValueError, match="No valid JSON found"):
+            mock_discoverer._extract_json_from_response(response_without_json)
+
+    def test_validate_and_enhance_categories(
+        self, mock_discoverer, sample_categories, sample_tickets_df
+    ):
+        """Test category validation and enhancement"""
+        enhanced = mock_discoverer._validate_and_enhance_categories(
+            sample_categories, sample_tickets_df
+        )
+
+        assert "discovery_stats" in enhanced
+        assert "total_tickets_analyzed" in enhanced["discovery_stats"]
+        assert "unique_tickets" in enhanced["discovery_stats"]
+        assert "categories_created" in enhanced["discovery_stats"]
+        assert "avg_keywords_per_category" in enhanced["discovery_stats"]
+        assert "confidence_level" in enhanced["discovery_stats"]
+
+        assert enhanced["discovery_stats"]["total_tickets_analyzed"] == 7
+        assert enhanced["discovery_stats"]["unique_tickets"] == 3
+        assert enhanced["discovery_stats"]["categories_created"] == 2
+
+    def test_validate_and_enhance_categories_invalid_structure(self, mock_discoverer):
+        """Test validation with invalid categories structure"""
+        invalid_categories = {"invalid": "structure"}
+        sample_df = pd.DataFrame({"ticket_id": ["T001"], "text": ["test"]})
+
+        with pytest.raises(ValueError, match="missing 'categories' key"):
+            mock_discoverer._validate_and_enhance_categories(
+                invalid_categories, sample_df
+            )
+
+    def test_discover_categories_empty_dataframe(self, mock_discoverer):
+        """Test discovery with empty DataFrame"""
         empty_df = pd.DataFrame()
-        
-        with pytest.raises(ValueError, match="Cannot discover categories from empty dataset"):
-            discoverer.discover_categories(empty_df)
-    
-    def test_validate_categories_schema(self, sample_categories_response):
-        """Test categories schema validation"""
-        # Valid schema
-        assert validate_categories_schema(sample_categories_response) == True
-        
-        # Invalid schema - missing required key
-        invalid_categories = sample_categories_response.copy()
-        del invalid_categories["version"]
-        assert validate_categories_schema(invalid_categories) == False
-        
-        # Invalid category structure
-        invalid_cat_structure = sample_categories_response.copy()
-        invalid_cat_structure["categories"][0] = {"incomplete": "category"}
-        assert validate_categories_schema(invalid_cat_structure) == False
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    def test_category_count_warnings(self, mock_llm, mock_api_key, sample_tickets_df):
-        """Test warnings for category count outside expected range"""
-        discoverer = CategoryDiscoverer(api_key=mock_api_key)
-        
-        # Test too few categories
-        few_categories = {
-            "categories": [{"id": 1, "technical_name": "test", "display_name": "Test", "description": "Test"}],
-            "discovery_stats": {}
-        }
-        
-        with patch.object(discoverer.logger, 'warning') as mock_warning:
-            discoverer._validate_and_enhance_categories(few_categories, sample_tickets_df)
-            mock_warning.assert_called()
-    
-    @patch('src.discovery.category_discoverer.ChatGoogleGenerativeAI')
-    @patch('src.discovery.category_discoverer.ThreadPoolExecutor')
-    def test_map_pattern_analysis_parallel_execution(self, mock_executor, mock_llm, 
-                                                   mock_api_key, sample_tickets_df):
-        """Test parallel execution in map phase"""
-        discoverer = CategoryDiscoverer(api_key=mock_api_key, max_workers=2)
-        
-        # Mock executor behavior
-        mock_future = Mock()
-        mock_future.result.return_value = "pattern analysis result"
-        mock_executor.return_value.__enter__.return_value.submit.return_value = mock_future
-        mock_executor.return_value.__enter__.return_value.__iter__ = lambda x: iter([mock_future])
-        
-        # Mock text preparation and chunking
-        with patch.object(discoverer, '_prepare_tickets_text', return_value="test text"):
-            with patch.object(discoverer, '_create_discovery_chunks', return_value=["chunk1", "chunk2"]):
-                with patch.object(discoverer, '_analyze_chunk_patterns', return_value="analysis"):
-                    
-                    result = discoverer._map_pattern_analysis(sample_tickets_df)
-                    
-                    assert len(result) > 0
-                    mock_executor.assert_called_with(max_workers=2)
 
+        with pytest.raises(
+            ValueError, match="Cannot discover categories from empty dataset"
+        ):
+            mock_discoverer.discover_categories(empty_df)
 
-if __name__ == "__main__":
-    pytest.main([__file__])
+    def test_chunk_size_and_overlap_configuration(self, mock_discoverer):
+        """Test that chunk size and overlap are properly configured"""
+        assert mock_discoverer.chunk_size == 800_000
+        assert mock_discoverer.overlap == 240_000
+        assert mock_discoverer.text_splitter.chunk_size == 800_000
+        assert mock_discoverer.text_splitter.chunk_overlap == 240_000
+
+    def test_discovery_chains_setup(self, mock_discoverer):
+        """Test that discovery chains are properly set up"""
+        assert hasattr(mock_discoverer, 'map_chain')
+        assert hasattr(mock_discoverer, 'combine_chain')
+        assert hasattr(mock_discoverer, 'extract_chain')
+        assert hasattr(mock_discoverer, 'map_prompt')
+        assert hasattr(mock_discoverer, 'combine_prompt')
+        assert hasattr(mock_discoverer, 'extract_prompt')

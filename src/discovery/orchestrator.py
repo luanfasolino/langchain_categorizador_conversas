@@ -266,7 +266,8 @@ class TwoPhaseOrchestrator(BaseProcessor):
         try:
             # Initialize sampler
             self.sampler = IntelligentSampler(
-                api_key=self.api_key, database_dir=self.database_dir
+                strategy=self.config.sampling_strategy,
+                random_state=42  # Use fixed seed for reproducible results
             )
 
             # Step 1: Intelligent sampling

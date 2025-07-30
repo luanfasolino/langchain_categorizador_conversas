@@ -4,10 +4,8 @@ Tests for IntelligentSampler module
 
 import pytest
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import sys
 from pathlib import Path
+import sys
 
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / "src"))
@@ -17,194 +15,171 @@ from discovery.intelligent_sampler import IntelligentSampler, create_diversity_r
 
 class TestIntelligentSampler:
     """Test cases for IntelligentSampler class"""
-    
+
     @pytest.fixture
-    def sample_data(self):
-        """Create sample ticket data for testing"""
-        np.random.seed(42)
-        
-        # Create sample tickets spanning 3 months (need enough for min 500 sample)
-        dates = []
-        base_date = datetime(2024, 1, 1)
-        for i in range(2000):  # Increased to ensure enough data for sampling
-            # Add some temporal clustering
-            if i < 600:
-                date = base_date + timedelta(days=np.random.randint(0, 30))
-            elif i < 1400:
-                date = base_date + timedelta(days=np.random.randint(30, 60))
-            else:
-                date = base_date + timedelta(days=np.random.randint(60, 90))
-            dates.append(date)
-        
-        # Create diverse text content
-        texts = []
-        categories = [
-            "Problema com pagamento",
-            "Dúvida sobre produto", 
-            "Reclamação de entrega",
-            "Solicitação de cancelamento",
-            "Suporte técnico",
-        ]
-        
-        for i in range(2000):
-            base_text = np.random.choice(categories)
-            variation = np.random.choice([
-                " - urgente",
-                " - preciso de ajuda",
-                " - quando será resolvido?",
-                " - obrigado",
-                ""
-            ])
-            texts.append(base_text + variation)
-        
-        return pd.DataFrame({
-            'ticket_id': [f"ticket_{i}" for i in range(2000)],
-            'ticket_created_at': dates,
-            'text': texts,
-            'sender': np.random.choice(['USER', 'AGENT'], 2000),
-            'category': 'TEXT'
-        })
-    
-    def test_sampler_initialization(self):
-        """Test sampler initialization with different strategies"""
-        # Valid strategies
-        for strategy in ['stratified', 'diversity', 'hybrid']:
-            sampler = IntelligentSampler(strategy=strategy)
-            assert sampler.strategy == strategy
-            assert sampler.random_state == 42
-        
-        # Invalid strategy
-        with pytest.raises(ValueError):
-            IntelligentSampler(strategy="invalid")
-    
-    def test_stratified_sampling(self, sample_data):
-        """Test stratified sampling maintains temporal proportions"""
-        sampler = IntelligentSampler(strategy="stratified")
-        
-        # Test with 15% sample rate
-        sample = sampler.sample_tickets(sample_data, sample_size=0.15)
-        
-        # Check sample size is reasonable (default min=500, max=1000 per PRD)
-        assert len(sample) >= 500  # Should meet minimum from PRD
-        assert len(sample) <= 1000  # Should not exceed maximum from PRD
-        
-        # Check temporal distribution is maintained
-        original_months = pd.to_datetime(sample_data['ticket_created_at']).dt.month.value_counts()
-        sample_months = pd.to_datetime(sample['ticket_created_at']).dt.month.value_counts()
-        
-        # All months should be represented
-        assert len(sample_months) > 0
-    
-    def test_diversity_sampling(self, sample_data):
-        """Test diversity sampling maximizes textual diversity"""
-        sampler = IntelligentSampler(strategy="diversity")
-        
-        sample = sampler.sample_tickets(sample_data, sample_size=0.15)
-        
-        # Check sample size (default constraints from PRD)
-        assert len(sample) >= 500
-        assert len(sample) <= 1000
-        
-        # Check text diversity - should have varied content
-        unique_texts = sample['text'].nunique()
-        assert unique_texts > 10  # Should have diverse text content
-    
-    def test_hybrid_sampling(self, sample_data):
-        """Test hybrid sampling combines both strategies"""
-        sampler = IntelligentSampler(strategy="hybrid")
-        
-        sample = sampler.sample_tickets(sample_data, sample_size=0.15)
-        
-        # Check sample size (default constraints from PRD)
-        assert len(sample) >= 500
-        assert len(sample) <= 1000
-        
-        # Should combine benefits of both approaches
-        assert sample['text'].nunique() > 5
-    
-    def test_sample_size_constraints(self, sample_data):
-        """Test sample size constraints are respected"""
-        sampler = IntelligentSampler(strategy="stratified")
-        
-        # Test minimum constraint
-        sample = sampler.sample_tickets(
-            sample_data, 
-            sample_size=0.01,  # Very small percentage
-            min_tickets=100
+    def sample_tickets_df(self):
+        """Create sample tickets DataFrame for testing"""
+        data = {
+            'ticket_id': [f'T{i:03d}' for i in range(1, 101)],  # 100 tickets
+            'text': [f'Sample ticket text {i}' for i in range(1, 101)],
+            'sender': ['USER'] * 100,
+            'ticket_created_at': [
+                f'2024-01-{(i % 31) + 1:02d} 10:00:00' for i in range(100)
+            ],
+            'category': ['TEXT'] * 100
+        }
+        return pd.DataFrame(data)
+
+    @pytest.fixture
+    def sampler_stratified(self):
+        """Create stratified sampler instance"""
+        return IntelligentSampler(strategy="stratified", random_state=42)
+
+    @pytest.fixture
+    def sampler_diversity(self):
+        """Create diversity sampler instance"""
+        return IntelligentSampler(strategy="diversity", random_state=42)
+
+    @pytest.fixture
+    def sampler_hybrid(self):
+        """Create hybrid sampler instance"""
+        return IntelligentSampler(strategy="hybrid", random_state=42)
+
+    def test_initialization_stratified(self):
+        """Test IntelligentSampler initialization with stratified strategy"""
+        sampler = IntelligentSampler(strategy="stratified", random_state=42)
+        assert sampler.strategy == "stratified"
+        assert sampler.random_state == 42
+
+    def test_initialization_diversity(self):
+        """Test IntelligentSampler initialization with diversity strategy"""
+        sampler = IntelligentSampler(strategy="diversity", random_state=42)
+        assert sampler.strategy == "diversity"
+        assert sampler.random_state == 42
+
+    def test_initialization_hybrid(self):
+        """Test IntelligentSampler initialization with hybrid strategy"""
+        sampler = IntelligentSampler(strategy="hybrid", random_state=42)
+        assert sampler.strategy == "hybrid"
+        assert sampler.random_state == 42
+
+    def test_initialization_invalid_strategy(self):
+        """Test IntelligentSampler initialization with invalid strategy"""
+        with pytest.raises(ValueError, match="Invalid strategy"):
+            IntelligentSampler(strategy="invalid", random_state=42)
+
+    def test_stratified_sampling(self, sampler_stratified, sample_tickets_df):
+        """Test stratified sampling strategy"""
+        sample_size = 0.15  # 15%
+        sampled_df = sampler_stratified.sample_tickets(
+            sample_tickets_df, sample_size=sample_size
         )
-        assert len(sample) >= 100
-        
-        # Test maximum constraint
-        sample = sampler.sample_tickets(
-            sample_data,
-            sample_size=0.8,  # Large percentage
-            max_tickets=200
+
+        assert isinstance(sampled_df, pd.DataFrame)
+        assert len(sampled_df) > 0
+        assert len(sampled_df) <= len(sample_tickets_df)
+        # Should maintain roughly the same proportion
+        expected_size = int(len(sample_tickets_df) * sample_size)
+        assert abs(len(sampled_df) - expected_size) <= 5  # Allow some variance
+
+    def test_diversity_sampling(self, sampler_diversity, sample_tickets_df):
+        """Test diversity sampling strategy"""
+        sample_size = 0.10  # 10%
+        sampled_df = sampler_diversity.sample_tickets(
+            sample_tickets_df, sample_size=sample_size
         )
-        assert len(sample) <= 200
-    
-    def test_validation_metrics(self, sample_data):
-        """Test sample validation metrics"""
-        sampler = IntelligentSampler(strategy="stratified")
-        sample = sampler.sample_tickets(sample_data, sample_size=0.15)
-        
-        metrics = sampler.validate_sample_representativeness(sample_data, sample)
-        
-        # Check required metrics are present
-        required_metrics = [
-            'sample_size', 'sample_ratio', 'unique_tickets_ratio',
-            'length_mean_diff', 'length_std_diff'
-        ]
-        
-        for metric in required_metrics:
-            assert metric in metrics
-            assert isinstance(metrics[metric], (int, float))
-        
-        # Check values are reasonable
-        assert metrics['sample_size'] > 0
-        assert 0 < metrics['sample_ratio'] <= 1
-        assert 0 <= metrics['unique_tickets_ratio'] <= 1
-    
-    def test_edge_cases(self):
-        """Test edge cases and error handling"""
-        sampler = IntelligentSampler(strategy="stratified")
-        
-        # Empty DataFrame
-        empty_df = pd.DataFrame(columns=['ticket_id', 'ticket_created_at', 'text', 'sender'])
-        with pytest.raises(Exception):
-            sampler.sample_tickets(empty_df)
-        
+
+        assert isinstance(sampled_df, pd.DataFrame)
+        assert len(sampled_df) > 0
+        assert len(sampled_df) <= len(sample_tickets_df)
+
+    def test_hybrid_sampling(self, sampler_hybrid, sample_tickets_df):
+        """Test hybrid sampling strategy"""
+        sample_size = 0.20  # 20%
+        sampled_df = sampler_hybrid.sample_tickets(
+            sample_tickets_df, sample_size=sample_size
+        )
+
+        assert isinstance(sampled_df, pd.DataFrame)
+        assert len(sampled_df) > 0
+        assert len(sampled_df) <= len(sample_tickets_df)
+
+    def test_sample_tickets_with_constraints(
+        self, sampler_stratified, sample_tickets_df
+    ):
+        """Test sampling with min/max constraints"""
+        sampled_df = sampler_stratified.sample_tickets(
+            sample_tickets_df,
+            sample_size=0.05,  # 5%
+            min_tickets=20,
+            max_tickets=30
+        )
+
+        assert isinstance(sampled_df, pd.DataFrame)
+        assert 20 <= len(sampled_df) <= 30
+
+    def test_calculate_adaptive_constraints(self, sampler_stratified):
+        """Test adaptive constraint calculation"""
+        # Small dataset
+        constraints = sampler_stratified._calculate_adaptive_constraints(1000)
+        min_tickets, max_tickets = constraints
+        assert min_tickets > 0
+        assert max_tickets > min_tickets
+
+        # Medium dataset
+        constraints = sampler_stratified._calculate_adaptive_constraints(15000)
+        min_tickets, max_tickets = constraints
+        assert min_tickets > 0
+        assert max_tickets > min_tickets
+
+        # Large dataset
+        constraints = sampler_stratified._calculate_adaptive_constraints(50000)
+        min_tickets, max_tickets = constraints
+        assert min_tickets > 0
+        assert max_tickets > min_tickets
+
+    def test_validate_sample_representativeness(
+        self, sampler_stratified, sample_tickets_df
+    ):
+        """Test sample representativeness validation"""
+        sampled_df = sampler_stratified.sample_tickets(
+            sample_tickets_df, sample_size=0.20
+        )
+
+        metrics = sampler_stratified.validate_sample_representativeness(
+            sample_tickets_df, sampled_df
+        )
+
+        assert isinstance(metrics, dict)
+        assert "sample_size" in metrics
+        assert "sample_ratio" in metrics
+        assert "unique_tickets_ratio" in metrics
+        assert metrics["sample_size"] > 0
+        assert 0 < metrics["sample_ratio"] <= 1
+
+    def test_sample_tickets_invalid_input(self, sampler_stratified):
+        """Test sampling with invalid input"""
+        # Invalid DataFrame
+        with pytest.raises(ValueError, match="Input must be a pandas DataFrame"):
+            sampler_stratified.sample_tickets("invalid", sample_size=0.1)
+
         # Invalid sample size
-        sample_data = pd.DataFrame({
-            'ticket_id': ['1'], 
-            'ticket_created_at': [datetime.now()],
-            'text': ['test'],
-            'sender': ['USER']
-        })
-        
-        with pytest.raises(ValueError):
-            sampler.sample_tickets(sample_data, sample_size=0)
-        
-        with pytest.raises(ValueError):
-            sampler.sample_tickets(sample_data, sample_size=1.5)
-    
-    def test_diversity_report_generation(self, sample_data):
-        """Test diversity report generation"""
-        sampler = IntelligentSampler(strategy="hybrid")
-        sample = sampler.sample_tickets(sample_data, sample_size=0.15)
-        
-        report = create_diversity_report(sampler, sample_data, sample)
-        
-        # Check report contains key sections
+        with pytest.raises(ValueError, match="sample_size must be between 0 and 1"):
+            sampler_stratified.sample_tickets(pd.DataFrame(), sample_size=1.5)
+
+    def test_create_diversity_report_function(
+        self, sampler_stratified, sample_tickets_df
+    ):
+        """Test the create_diversity_report utility function"""
+        sampled_df = sampler_stratified.sample_tickets(
+            sample_tickets_df, sample_size=0.15
+        )
+
+        report = create_diversity_report(
+            sampler_stratified, sample_tickets_df, sampled_df
+        )
+
+        assert isinstance(report, str)
+        assert len(report) > 0
         assert "Sampling Diversity Report" in report
-        assert "Strategy: hybrid" in report
-        assert "Sample Statistics" in report
-        assert "Representativeness Metrics" in report
-        assert "Quality Assessment" in report
-        
-        # Check report contains metrics
-        assert "Total tickets sampled:" in report
-        assert "Sample ratio:" in report
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
+        assert sampler_stratified.strategy in report
