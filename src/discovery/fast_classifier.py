@@ -632,8 +632,8 @@ CLASSIFICAÇÃO:"""
         Returns:
             Estimated cost in USD
         """
-        # Gemini 2.5 Flash pricing (approximate)
-        cost_per_1k_tokens = 0.000075  # $0.075 per 1M tokens
+        # Gemini 2.5 Flash pricing (as of July 2025)
+        cost_per_1k_tokens = 0.0003  # $0.30 per 1M input tokens
         return (total_tokens / 1000) * cost_per_1k_tokens
 
     def get_classification_stats(self, results_df: pd.DataFrame) -> Dict[str, Any]:

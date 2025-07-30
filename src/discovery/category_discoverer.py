@@ -8,6 +8,7 @@ sample tickets to identify and extract category patterns using map-reduce archit
 import json
 import logging
 import pandas as pd
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -82,8 +83,8 @@ class CategoryDiscoverer(BaseProcessor):
         )
 
         # Discovery-specific configurations
-        self.chunk_size = 800_000  # 800K tokens for discovery phase
-        self.overlap = 240_000  # 30% overlap for better context
+        self.chunk_size = 50_000  # 50K tokens per chunk (recommended maximum)
+        self.overlap = 15_000  # 30% overlap for better context
         self.min_categories = 5  # Minimum categories to discover
         self.max_categories = 25  # Maximum categories to prevent over-fragmentation
 
@@ -566,12 +567,20 @@ Retorne EXATAMENTE no formato JSON especificado:
         Returns:
             Cleaned JSON string
         """
-        # Find JSON boundaries
-        start_idx = response.find("{")
-        end_idx = response.rfind("}")
+        # Try to find JSON object in the response
+        json_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
+        matches = re.findall(json_pattern, response, re.DOTALL)
 
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            return response[start_idx : end_idx + 1]
+        if not matches:
+            raise ValueError("No valid JSON found in response")
+
+        # Try to parse each match to find valid JSON
+        for match in matches:
+            try:
+                json.loads(match)  # Validate it's proper JSON
+                return match
+            except json.JSONDecodeError:
+                continue
 
         raise ValueError("No valid JSON found in response")
 
@@ -663,6 +672,7 @@ def merge_categories(
     """
     # Implementation for merging categories
     # This is a placeholder - would need sophisticated logic to handle conflicts
+    # TODO: Implement merging logic
     pass
 
 

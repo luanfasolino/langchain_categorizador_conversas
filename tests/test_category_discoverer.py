@@ -12,12 +12,10 @@ import sys
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
-# Mock the path operations globally for tests
-with patch("src.discovery.category_discoverer.Path"):
-    from discovery.category_discoverer import (
-        CategoryDiscoverer,
-        validate_categories_schema,
-    )
+from discovery.category_discoverer import (
+    CategoryDiscoverer,
+    validate_categories_schema,
+)
 
 
 class TestCategoryDiscoverer:
@@ -115,8 +113,8 @@ class TestCategoryDiscoverer:
 
                 # API key is passed to LLM, not stored as attribute
                 assert discoverer.database_dir == Path(tmp_dir)
-                assert discoverer.chunk_size == 800_000
-                assert discoverer.overlap == 240_000
+                assert discoverer.chunk_size == 50_000
+                assert discoverer.overlap == 15_000
                 assert discoverer.min_categories == 5
                 assert discoverer.max_categories == 25
 
@@ -315,10 +313,10 @@ class TestCategoryDiscoverer:
 
     def test_chunk_size_and_overlap_configuration(self, mock_discoverer):
         """Test that chunk size and overlap are properly configured"""
-        assert mock_discoverer.chunk_size == 800_000
-        assert mock_discoverer.overlap == 240_000
-        assert mock_discoverer.text_splitter._chunk_size == 800_000
-        assert mock_discoverer.text_splitter._chunk_overlap == 240_000
+        assert mock_discoverer.chunk_size == 50_000
+        assert mock_discoverer.overlap == 15_000
+        assert mock_discoverer.text_splitter._chunk_size == 50_000
+        assert mock_discoverer.text_splitter._chunk_overlap == 15_000
 
     def test_discovery_chains_setup(self, mock_discoverer):
         """Test that discovery chains are properly set up"""
