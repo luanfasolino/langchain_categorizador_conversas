@@ -140,6 +140,9 @@ database/cache/
 .taskmaster/
 docs/
 
+# Development documentation
+CLAUDE.md
+
 # Editor directories and files
 .idea/
 .vscode/
