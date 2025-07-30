@@ -13,7 +13,6 @@ import sys
 import pandas as pd
 import json
 import tempfile
-import os
 from pathlib import Path
 from unittest.mock import Mock, patch
 from datetime import datetime, timedelta
@@ -272,7 +271,7 @@ def test_orchestrator_integration():
     tickets_df = create_comprehensive_test_data()
     mock_categories = create_mock_discovery_categories()
     
-    print(f"\n📊 Test Dataset:")
+    print("\n📊 Test Dataset:")
     print(f"  Total messages: {len(tickets_df):,}")
     print(f"  Unique tickets: {tickets_df['ticket_id'].nunique():,}")
     print(f"  Date range: {tickets_df['message_sended_at'].min()} to {tickets_df['message_sended_at'].max()}")
@@ -285,7 +284,7 @@ def test_orchestrator_integration():
             run_complete_pipeline
         )
         
-        print(f"\n✅ Orchestrator components imported successfully")
+        print("\n✅ Orchestrator components imported successfully")
         
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -304,10 +303,10 @@ def test_orchestrator_integration():
                 cost_target_per_1k=0.20,
                 confidence_threshold=0.85
             )
-            print(f"✅ Test configuration created")
+            print("✅ Test configuration created")
             
             # Mock the discovery and application phases for testing
-            print(f"\n🔄 Testing orchestrator initialization...")
+            print("\n🔄 Testing orchestrator initialization...")
             
             with patch('discovery.orchestrator.IntelligentSampler') as mock_sampler_class, \
                  patch('discovery.orchestrator.CategoryDiscoverer') as mock_discoverer_class, \
@@ -375,23 +374,23 @@ def test_orchestrator_integration():
                     database_dir=tmp_path,
                     config=test_config
                 )
-                print(f"✅ Orchestrator initialized")
+                print("✅ Orchestrator initialized")
                 
                 # Test orchestrator configuration
                 assert orchestrator.config.sample_rate == 0.5
                 assert orchestrator.config.sampling_strategy == "stratified"
                 assert orchestrator.config.batch_size == 20
-                print(f"✅ Configuration validation passed")
+                print("✅ Configuration validation passed")
                 
                 # Test data loading and validation
-                print(f"\n🔍 Testing data loading and validation...")
+                print("\n🔍 Testing data loading and validation...")
                 loaded_df = orchestrator._load_and_validate_input(input_file)
                 assert len(loaded_df) == len(tickets_df)
                 assert 'ticket_id' in loaded_df.columns
                 print(f"✅ Data loading successful: {len(loaded_df)} tickets")
                 
                 # Test discovery phase execution
-                print(f"\n🎯 Testing discovery phase...")
+                print("\n🎯 Testing discovery phase...")
                 output_dir = tmp_path / "output"
                 output_dir.mkdir()
                 
@@ -402,12 +401,12 @@ def test_orchestrator_integration():
                 assert categories_path.exists() or mock_discoverer.discover_categories.called
                 assert 'sample_size' in orchestrator.discovery_metrics
                 assert 'categories_discovered' in orchestrator.discovery_metrics
-                print(f"✅ Discovery phase completed")
+                print("✅ Discovery phase completed")
                 print(f"  Sample size: {orchestrator.discovery_metrics.get('sample_size', 'mocked')}")
                 print(f"  Categories found: {orchestrator.discovery_metrics.get('categories_discovered', len(mock_categories['categories']))}")
                 
                 # Test application phase execution
-                print(f"\n🚀 Testing application phase...")
+                print("\n🚀 Testing application phase...")
                 
                 # Save mock categories for application phase
                 categories_file = output_dir / "discovered_categories.json"
@@ -420,12 +419,12 @@ def test_orchestrator_integration():
                 
                 assert 'total_tickets' in orchestrator.application_metrics
                 assert 'classified_tickets' in orchestrator.application_metrics
-                print(f"✅ Application phase completed")
+                print("✅ Application phase completed")
                 print(f"  Total tickets: {orchestrator.application_metrics.get('total_tickets', len(loaded_df))}")
                 print(f"  Processing time: {orchestrator.application_metrics.get('processing_time', 'mocked'):.1f}s")
                 
                 # Test metrics generation
-                print(f"\n📈 Testing metrics generation...")
+                print("\n📈 Testing metrics generation...")
                 
                 # Mock start time for metrics calculation
                 orchestrator.start_time = 1000.0
@@ -439,14 +438,14 @@ def test_orchestrator_integration():
                         loaded_df, categories_file, results_file, output_dir
                     )
                 
-                print(f"✅ Metrics generation completed")
+                print("✅ Metrics generation completed")
                 print(f"  Total processing time: {metrics.total_processing_time:.1f}s")
                 print(f"  Cost per 1K tickets: ${metrics.cost_per_1k_tickets:.4f}")
                 print(f"  Average confidence: {metrics.avg_confidence:.3f}")
                 print(f"  Classification rate: {metrics.classification_rate:.1%}")
                 
                 # Test metrics saving
-                print(f"\n💾 Testing metrics persistence...")
+                print("\n💾 Testing metrics persistence...")
                 orchestrator._save_orchestration_metrics(metrics, output_dir)
                 
                 metrics_file = output_dir / "orchestration_metrics.json"
@@ -459,10 +458,10 @@ def test_orchestrator_integration():
                 assert 'orchestration_summary' in saved_metrics
                 assert 'phase_breakdown' in saved_metrics
                 assert 'target_compliance' in saved_metrics
-                print(f"✅ Metrics saved successfully")
+                print("✅ Metrics saved successfully")
                 
                 # Test target compliance
-                print(f"\n🎯 Testing Opção D compliance...")
+                print("\n🎯 Testing Opção D compliance...")
                 print(f"  Cost target: ${test_config.cost_target_per_1k:.2f} per 1K tickets")
                 print(f"  Actual cost: ${metrics.cost_per_1k_tickets:.4f} per 1K tickets")
                 print(f"  Meets cost target: {'✅' if metrics.meets_cost_target else '❌'}")
@@ -471,7 +470,7 @@ def test_orchestrator_integration():
                 print(f"  Meets confidence target: {'✅' if metrics.meets_confidence_target else '❌'}")
                 
                 # Test complete pipeline integration
-                print(f"\n🔄 Testing complete pipeline execution...")
+                print("\n🔄 Testing complete pipeline execution...")
                 
                 # Create fresh output directory
                 pipeline_output = tmp_path / "pipeline_test"
@@ -494,23 +493,23 @@ def test_orchestrator_integration():
                     )
                     
                     assert pipeline_result == metrics
-                    print(f"✅ Complete pipeline utility test passed")
+                    print("✅ Complete pipeline utility test passed")
                 
-                print(f"\n🎉 ALL ORCHESTRATOR INTEGRATION TESTS PASSED!")
-                print(f"\n📋 INTEGRATION SUMMARY:")
-                print(f"✅ Data loading and validation")
-                print(f"✅ Discovery phase orchestration")
-                print(f"✅ Application phase orchestration")
-                print(f"✅ Metrics generation and validation")
-                print(f"✅ File persistence and management")
-                print(f"✅ Configuration management")
-                print(f"✅ Error handling and robustness")
-                print(f"✅ Opção D compliance checking")
-                print(f"✅ Complete pipeline integration")
+                print("\n🎉 ALL ORCHESTRATOR INTEGRATION TESTS PASSED!")
+                print("\n📋 INTEGRATION SUMMARY:")
+                print("✅ Data loading and validation")
+                print("✅ Discovery phase orchestration")
+                print("✅ Application phase orchestration")
+                print("✅ Metrics generation and validation")
+                print("✅ File persistence and management")
+                print("✅ Configuration management")
+                print("✅ Error handling and robustness")
+                print("✅ Opção D compliance checking")
+                print("✅ Complete pipeline integration")
                 
-                print(f"\n🚀 TwoPhaseOrchestrator is ready for production use!")
-                print(f"The orchestrator successfully coordinates all Opção D components")
-                print(f"and provides comprehensive monitoring and validation.")
+                print("\n🚀 TwoPhaseOrchestrator is ready for production use!")
+                print("The orchestrator successfully coordinates all Opção D components")
+                print("and provides comprehensive monitoring and validation.")
         
     except Exception as e:
         print(f"\n❌ Integration test failed: {e}")

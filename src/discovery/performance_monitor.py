@@ -442,7 +442,7 @@ class PerformanceMonitor:
             overage = cost_metrics.cost_per_1k_tickets - cost_metrics.target_cost_per_1k
             recommendations.append(
                 f"Cost exceeds target by ${overage:.4f} per 1K tickets. "
-                f"Consider reducing batch sizes or optimizing prompts."
+                "Consider reducing batch sizes or optimizing prompts."
             )
 
             if cost_metrics.discovery_cost_usd > cost_metrics.application_cost_usd:
@@ -464,13 +464,13 @@ class PerformanceMonitor:
         if not accuracy_metrics.meets_accuracy_target:
             recommendations.append(
                 f"Average confidence {accuracy_metrics.avg_confidence:.3f} below target. "
-                f"Consider improving category definitions or using more examples."
+                "Consider improving category definitions or using more examples."
             )
 
         if accuracy_metrics.category_coverage < 0.8:
             recommendations.append(
                 f"Low category coverage ({accuracy_metrics.category_coverage:.1%}). "
-                f"Some discovered categories may be unused - consider consolidation."
+                "Some discovered categories may be unused - consider consolidation."
             )
 
         if accuracy_metrics.consistency_score < 0.8:
