@@ -450,7 +450,7 @@ class BaseProcessor:
             print(f"Erro ao salvar cache: {str(e)}")
 
     def prepare_data(self, input_file: Path, nrows: int = None) -> List[dict]:
-        """Prepara os dados do arquivo de entrada com suporte a cache."""
+        """Prepara os dados do arquivo de entrada com suporte a cache e validação aprimorada."""
         # Gera chave de cache baseada no arquivo e número de linhas
         cache_key = self._generate_cache_key(
             {"file": str(input_file), "nrows": nrows, "method": "prepare_data"}
@@ -465,79 +465,484 @@ class BaseProcessor:
         # Se não estiver em cache, processa normalmente
         print(f"Processando dados de {input_file} (não encontrado em cache)")
 
-        # Detecta o tipo de arquivo e usa a função apropriada
+        # Carrega dados com tratamento robusto de arquivos
+        df = self._load_file_robust(input_file, nrows)
+        raw_count = len(df)
+        print(f"📊 Dados brutos carregados: {raw_count:,} registros")
+
+        # Validação e filtragem melhorada por category
+        df = self._filter_by_category(df)
+        category_filtered_count = len(df)
+        print(f"✅ Após filtro category='TEXT': {category_filtered_count:,} registros")
+
+        # Limpeza e preparação de campos
+        df = self._prepare_fields(df)
+
+        # Filtragem aprimorada de mensagens AI
+        df_filtered = self._filter_ai_messages(df)
+        ai_filtered_count = len(df_filtered)
+        print(f"🤖 Após remover mensagens AI: {ai_filtered_count:,} registros")
+
+        # Validação de contagem mínima de mensagens
+        df_filtered, valid_tickets = self._validate_message_counts(df_filtered)
+        final_count = len(df_filtered)
+        print(
+            f"💬 Tickets válidos (2+ USER e 2+ AGENT): {len(valid_tickets):,} tickets, {final_count:,} mensagens"
+        )
+
+        # Agrupa e finaliza
+        grouped = self._group_by_ticket(df_filtered)
+        result = grouped.to_dict(orient="records")
+
+        # Gera relatório de filtragem
+        self._generate_filtering_report(
+            raw_count,
+            category_filtered_count,
+            ai_filtered_count,
+            final_count,
+            len(valid_tickets),
+            len(result),
+        )
+
+        # Salva no cache
+        self._save_to_cache(cache_key, result)
+
+        return result
+
+    def _load_file_robust(self, input_file: Path, nrows: int = None) -> pd.DataFrame:
+        """Carrega arquivo com tratamento robusto para diferentes formatos e encodings."""
         if input_file.suffix.lower() == ".csv":
-            print("📄 Detectado arquivo CSV, usando pd.read_csv()")
-            # Parâmetros mais robustos para CSV malformado
-            df = pd.read_csv(
-                input_file,
-                nrows=nrows,
-                encoding="utf-8-sig",
-                sep=";",  # Usa ponto e vírgula como separador
-                quotechar='"',  # Usa aspas para campos com texto
-                escapechar="\\",  # Caractere de escape
-                on_bad_lines="skip",  # Pula linhas malformadas
-                low_memory=False,  # Carrega tudo na memória para ser mais robusto
-                dtype=str,  # Força todos os campos como string para evitar problemas de tipo
+            print(
+                "📄 Detectado arquivo CSV, tentando carregar com diferentes configurações..."
             )
-            print(f"⚠️  Arquivo CSV carregado com {len(df)} registros válidos")
+
+            # Lista de configurações para tentar
+            csv_configs = [
+                {"encoding": "utf-8-sig", "sep": ";"},
+                {"encoding": "utf-8", "sep": ";"},
+                {"encoding": "latin-1", "sep": ";"},
+                {"encoding": "utf-8-sig", "sep": ","},
+                {"encoding": "utf-8", "sep": ","},
+                {"encoding": "latin-1", "sep": ","},
+            ]
+
+            for i, config in enumerate(csv_configs):
+                try:
+                    df = pd.read_csv(
+                        input_file,
+                        nrows=nrows,
+                        quotechar='"',
+                        escapechar="\\",
+                        on_bad_lines="skip",
+                        low_memory=False,
+                        dtype=str,
+                        **config,
+                    )
+                    print(
+                        f"✅ CSV carregado com sucesso: encoding={config['encoding']}, sep='{config['sep']}'"
+                    )
+                    print(f"   Colunas detectadas: {list(df.columns)}")
+                    return df
+                except Exception as e:
+                    print(f"   Tentativa {i+1} falhou ({config}): {str(e)}")
+                    if i == len(csv_configs) - 1:
+                        raise Exception(
+                            f"Não foi possível carregar o arquivo CSV após {len(csv_configs)} tentativas"
+                        )
         else:
             print("📊 Detectado arquivo Excel, usando pd.read_excel()")
-            df = pd.read_excel(input_file, nrows=nrows)
+            try:
+                df = pd.read_excel(input_file, nrows=nrows, dtype=str)
+                print("✅ Excel carregado com sucesso")
+                print(f"   Colunas detectadas: {list(df.columns)}")
+                return df
+            except Exception as e:
+                raise Exception(f"Erro ao carregar arquivo Excel: {str(e)}")
 
-        print(f"Processando {len(df)} registros...")
+    def _filter_by_category(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Filtra registros por category='TEXT' com validação robusta case-insensitive."""
+        if "category" not in df.columns:
+            raise ValueError("Coluna 'category' não encontrada no arquivo")
 
-        # Filtra apenas registros com category 'text' (case insensitive)
-        df = df[df["category"].str.upper() == "TEXT"]
-        print(f"Registros após filtrar apenas category 'text/TEXT': {len(df)}")
+        # Converte para string e trata valores nulos
+        df["category"] = df["category"].fillna("").astype(str)
 
-        # Converte a coluna 'text' para string e trata valores nulos
+        # Filtragem case-insensitive mais robusta
+        df_filtered = df[df["category"].str.lower().str.strip() == "text"]
+
+        # Log das categorias encontradas para debug
+        categories_found = df["category"].value_counts().head(10)
+        print("📋 Top 10 categorias encontradas:")
+        for cat, count in categories_found.items():
+            print(f"   '{cat}': {count:,} registros")
+
+        return df_filtered
+
+    def _prepare_fields(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Prepara e limpa campos necessários."""
+        required_fields = ["text", "ticket_id", "sender"]
+        missing_fields = [field for field in required_fields if field not in df.columns]
+        if missing_fields:
+            raise ValueError(f"Campos obrigatórios não encontrados: {missing_fields}")
+
+        # Converte e limpa campos
         df["text"] = df["text"].fillna("").astype(str).apply(self.clean_text)
-        df["ticket_id"] = df["ticket_id"].astype(str)
+        df["ticket_id"] = df["ticket_id"].fillna("").astype(str)
+        df["sender"] = df["sender"].fillna("").astype(str)
 
-        # Remove mensagens onde sender é 'AI'
-        df_filtered = df[df["sender"] != "AI"]
-        print(f"Registros após remover mensagens AI: {len(df_filtered)}")
+        # Remove registros com campos vazios
+        initial_count = len(df)
+        df = df[
+            (df["text"].str.strip() != "")
+            & (df["ticket_id"].str.strip() != "")
+            & (df["sender"].str.strip() != "")
+        ]
+        final_count = len(df)
 
-        # Conta mensagens de USER e AGENT por ticket (HELPDESK_INTEGRATION = AGENT)
-        user_messages = df_filtered[df_filtered["sender"] == "USER"][
+        if initial_count != final_count:
+            print(
+                f"⚠️  Removidos {initial_count - final_count} registros com campos vazios"
+            )
+
+        return df
+
+    def _filter_ai_messages(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Filtra mensagens AI com detecção aprimorada de padrões."""
+        # Padrões de sender que indicam mensagens AI
+        ai_patterns = [
+            "ai",
+            "AI",
+            "Ai",
+            "aI",
+            "bot",
+            "BOT",
+            "Bot",
+            "BoT",
+            "assistant",
+            "ASSISTANT",
+            "Assistant",
+            "ai_assistant",
+            "AI_ASSISTANT",
+            "chatbot",
+            "CHATBOT",
+            "ChatBot",
+            "automated",
+            "AUTOMATED",
+            "Automated",
+            "system",
+            "SYSTEM",
+            "System",
+            "auto",
+            "AUTO",
+            "Auto",
+        ]
+
+        # Log das categorias de sender encontradas
+        sender_counts = df["sender"].value_counts()
+        print("📨 Tipos de sender encontrados:")
+        for sender, count in sender_counts.items():
+            print(f"   '{sender}': {count:,} mensagens")
+
+        # Filtra usando padrões mais robustos
+        ai_mask = (
+            df["sender"].str.lower().str.strip().isin([p.lower() for p in ai_patterns])
+        )
+        ai_messages_count = ai_mask.sum()
+
+        df_filtered = df[~ai_mask]
+
+        print(f"🤖 Mensagens AI removidas: {ai_messages_count:,}")
+        print(f"   Padrões detectados: {df[ai_mask]['sender'].unique().tolist()}")
+
+        return df_filtered
+
+    def _validate_message_counts(self, df: pd.DataFrame) -> tuple:
+        """Valida contagem mínima de mensagens por ticket com relatórios detalhados."""
+        # Conta mensagens por tipo de sender
+        user_messages = df[df["sender"] == "USER"]["ticket_id"].value_counts()
+        agent_messages = df[df["sender"].isin(["AGENT", "HELPDESK_INTEGRATION"])][
             "ticket_id"
         ].value_counts()
-        agent_messages = df_filtered[
-            df_filtered["sender"].isin(["AGENT", "HELPDESK_INTEGRATION"])
-        ]["ticket_id"].value_counts()
 
-        # Identifica tickets com pelo menos duas mensagens de cada
-        valid_tickets = set(user_messages[user_messages >= 2].index).intersection(
-            set(agent_messages[agent_messages >= 2].index)
-        )
+        # Estatísticas detalhadas
+        print("📊 Estatísticas de mensagens por ticket:")
+        if len(user_messages) > 0:
+            print(
+                f"   USER - Média: {user_messages.mean():.1f}, Mediana: {user_messages.median():.1f}, Máx: {user_messages.max()}"
+            )
+        if len(agent_messages) > 0:
+            print(
+                f"   AGENT - Média: {agent_messages.mean():.1f}, Mediana: {agent_messages.median():.1f}, Máx: {agent_messages.max()}"
+            )
 
-        # Filtra o DataFrame
-        df_filtered = df_filtered[df_filtered["ticket_id"].isin(valid_tickets)]
-        print(
-            f"Tickets com pelo menos duas mensagens do USER e duas do AGENT: {len(valid_tickets)}"
-        )
+        # Identifica tickets válidos (pelo menos 2 mensagens de cada tipo)
+        valid_user_tickets = set(user_messages[user_messages >= 2].index)
+        valid_agent_tickets = set(agent_messages[agent_messages >= 2].index)
+        valid_tickets = valid_user_tickets.intersection(valid_agent_tickets)
 
-        # Agrupa os textos por ticket_id
+        print(f"✅ Tickets com 2+ mensagens USER: {len(valid_user_tickets):,}")
+        print(f"✅ Tickets com 2+ mensagens AGENT: {len(valid_agent_tickets):,}")
+        print(f"✅ Tickets válidos (ambos critérios): {len(valid_tickets):,}")
+
+        # Filtra DataFrame
+        df_filtered = df[df["ticket_id"].isin(valid_tickets)]
+
+        return df_filtered, valid_tickets
+
+    def _group_by_ticket(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Agrupa mensagens por ticket com preservação de metadados."""
         grouped = (
-            df_filtered.groupby("ticket_id")
+            df.groupby("ticket_id")
             .agg(
                 {
                     "text": lambda x: " ".join(filter(None, x)),
                     "ticket_created_at": "first",
+                    "sender": lambda x: f"Total: {len(x)} mensagens ({x.value_counts().to_dict()})",
                 }
             )
             .reset_index()
         )
 
         # Remove tickets sem texto
+        initial_count = len(grouped)
         grouped = grouped[grouped["text"].str.strip() != ""]
-        result = grouped.to_dict(orient="records")
+        final_count = len(grouped)
 
-        # Salva no cache
-        self._save_to_cache(cache_key, result)
+        if initial_count != final_count:
+            print(
+                f"⚠️  Removidos {initial_count - final_count} tickets sem texto válido"
+            )
 
-        return result
+        # Estatísticas finais
+        if len(grouped) > 0:
+            text_lengths = grouped["text"].str.len()
+            print("📝 Estatísticas de texto por ticket:")
+            print(f"   Comprimento médio: {text_lengths.mean():.0f} caracteres")
+            print(f"   Comprimento mediano: {text_lengths.median():.0f} caracteres")
+            print(f"   Comprimento máximo: {text_lengths.max():,} caracteres")
+
+        return grouped
+
+    def _generate_filtering_report(
+        self,
+        raw_count: int,
+        category_count: int,
+        ai_count: int,
+        final_count: int,
+        valid_tickets: int,
+        grouped_count: int,
+    ):
+        """Gera relatório detalhado do processo de filtragem."""
+        print("\n" + "=" * 60)
+        print("📋 RELATÓRIO DE FILTRAGEM DE DADOS")
+        print("=" * 60)
+        print(f"Registros brutos:                    {raw_count:,}")
+        print(
+            f"Após filtro category='TEXT':         {category_count:,} ({category_count/raw_count*100:.1f}%)"
+        )
+        print(
+            f"Após remoção mensagens AI:           {ai_count:,} ({ai_count/raw_count*100:.1f}%)"
+        )
+        print(
+            f"Após validação contagem mensagens:   {final_count:,} ({final_count/raw_count*100:.1f}%)"
+        )
+        print(f"Tickets válidos únicos:              {valid_tickets:,}")
+        print(f"Tickets finais agrupados:            {grouped_count:,}")
+        print(
+            f"\nTaxa de aproveitamento final:        {grouped_count/raw_count*100:.1f}%"
+        )
+        print("=" * 60)
+
+    def generate_data_quality_report(
+        self, tickets: List[dict], output_file: Path = None
+    ) -> dict:
+        """Gera relatório detalhado de qualidade dos dados processados."""
+        if not tickets:
+            print("⚠️  Nenhum ticket para analisar")
+            return {}
+
+        # Converte para DataFrame para análise
+        df = pd.DataFrame(tickets)
+
+        # Calcula estatísticas básicas
+        ticket_count = len(df)
+
+        # Estatísticas de texto
+        text_lengths = df["text"].str.len()
+        text_word_counts = df["text"].str.split().str.len()
+
+        # Estatísticas por características do ticket
+        has_date = "ticket_created_at" in df.columns
+        date_stats = {}
+        if has_date:
+            df["ticket_created_at"] = pd.to_datetime(
+                df["ticket_created_at"], errors="coerce"
+            )
+            date_stats = {
+                "data_mais_antiga": df["ticket_created_at"].min(),
+                "data_mais_recente": df["ticket_created_at"].max(),
+                "periodo_dias": (
+                    (df["ticket_created_at"].max() - df["ticket_created_at"].min()).days
+                    if pd.notna(df["ticket_created_at"].min())
+                    else 0
+                ),
+            }
+
+        # Compila relatório
+        quality_report = {
+            "resumo_geral": {
+                "total_tickets": ticket_count,
+                "tickets_validos": ticket_count,
+                "taxa_sucesso": 100.0,
+            },
+            "estatisticas_texto": {
+                "comprimento_caracteres": {
+                    "media": float(text_lengths.mean()),
+                    "mediana": float(text_lengths.median()),
+                    "minimo": int(text_lengths.min()),
+                    "maximo": int(text_lengths.max()),
+                    "desvio_padrao": float(text_lengths.std()),
+                },
+                "contagem_palavras": {
+                    "media": float(text_word_counts.mean()),
+                    "mediana": float(text_word_counts.median()),
+                    "minimo": int(text_word_counts.min()),
+                    "maximo": int(text_word_counts.max()),
+                    "desvio_padrao": float(text_word_counts.std()),
+                },
+            },
+            "distribuicao_mensagens": self._analyze_message_distribution(df),
+            "qualidade_dados": self._assess_data_quality(df),
+            "periodo_temporal": date_stats,
+        }
+
+        # Gera relatório visual
+        self._print_quality_report(quality_report)
+
+        # Salva em arquivo se especificado
+        if output_file:
+            import json
+
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(quality_report, f, indent=2, ensure_ascii=False, default=str)
+            print(f"📄 Relatório salvo em: {output_file}")
+
+        return quality_report
+
+    def _analyze_message_distribution(self, df: pd.DataFrame) -> dict:
+        """Analisa distribuição de mensagens por ticket."""
+        if "sender" in df.columns:
+            # Extrai informações de contagem de mensagens do campo sender
+            sender_info = df["sender"].str.extract(r"Total: (\d+) mensagens \((.+)\)")
+            message_counts = pd.to_numeric(sender_info[0], errors="coerce").dropna()
+
+            if len(message_counts) > 0:
+                return {
+                    "mensagens_por_ticket": {
+                        "media": float(message_counts.mean()),
+                        "mediana": float(message_counts.median()),
+                        "minimo": int(message_counts.min()),
+                        "maximo": int(message_counts.max()),
+                        "desvio_padrao": float(message_counts.std()),
+                    },
+                    "distribuicao_quartis": {
+                        "q1": float(message_counts.quantile(0.25)),
+                        "q2": float(message_counts.quantile(0.5)),
+                        "q3": float(message_counts.quantile(0.75)),
+                    },
+                }
+
+        return {"erro": "Informações de distribuição não disponíveis"}
+
+    def _assess_data_quality(self, df: pd.DataFrame) -> dict:
+        """Avalia qualidade geral dos dados."""
+        quality_metrics = {
+            "completude": {
+                "tickets_com_texto": (df["text"].str.strip() != "").sum()
+                / len(df)
+                * 100,
+                "tickets_com_id": (df["ticket_id"].str.strip() != "").sum()
+                / len(df)
+                * 100,
+            },
+            "consistencia": {
+                "ids_unicos": df["ticket_id"].nunique() == len(df),
+                "textos_nao_vazios": (df["text"].str.len() > 10).sum() / len(df) * 100,
+            },
+            "outliers": {
+                "textos_muito_longos": (
+                    df["text"].str.len() > df["text"].str.len().quantile(0.95)
+                ).sum(),
+                "textos_muito_curtos": (
+                    df["text"].str.len() < df["text"].str.len().quantile(0.05)
+                ).sum(),
+            },
+        }
+
+        return quality_metrics
+
+    def _print_quality_report(self, report: dict):
+        """Imprime relatório de qualidade de forma organizada."""
+        print("\n" + "=" * 80)
+        print("📊 RELATÓRIO DE QUALIDADE DOS DADOS")
+        print("=" * 80)
+
+        # Resumo geral
+        resumo = report["resumo_geral"]
+        print(f"Total de tickets processados:        {resumo['total_tickets']:,}")
+        print(f"Tickets válidos:                     {resumo['tickets_validos']:,}")
+        print(f"Taxa de sucesso:                     {resumo['taxa_sucesso']:.1f}%")
+
+        # Estatísticas de texto
+        print("\n📝 ESTATÍSTICAS DE TEXTO:")
+        texto = report["estatisticas_texto"]
+        chars = texto["comprimento_caracteres"]
+        words = texto["contagem_palavras"]
+
+        print(
+            f"Caracteres - Média: {chars['media']:.0f}, Mediana: {chars['mediana']:.0f}, Max: {chars['maximo']:,}"
+        )
+        print(
+            f"Palavras   - Média: {words['media']:.1f}, Mediana: {words['mediana']:.1f}, Max: {words['maximo']:,}"
+        )
+
+        # Distribuição de mensagens
+        if "mensagens_por_ticket" in report["distribuicao_mensagens"]:
+            print("\n💬 DISTRIBUIÇÃO DE MENSAGENS:")
+            msgs = report["distribuicao_mensagens"]["mensagens_por_ticket"]
+            print(
+                f"Mensagens por ticket - Média: {msgs['media']:.1f}, Mediana: {msgs['mediana']:.1f}, Max: {msgs['maximo']}"
+            )
+
+        # Qualidade dos dados
+        print("\n✅ QUALIDADE DOS DADOS:")
+        quality = report["qualidade_dados"]
+        print(
+            f"Completude texto:                    {quality['completude']['tickets_com_texto']:.1f}%"
+        )
+        print(
+            f"Consistência IDs:                    {'✓' if quality['consistencia']['ids_unicos'] else '✗'}"
+        )
+        print(
+            f"Textos adequados (>10 chars):        {quality['consistencia']['textos_nao_vazios']:.1f}%"
+        )
+
+        # Período temporal
+        if report["periodo_temporal"]:
+            periodo = report["periodo_temporal"]
+            print("\n📅 PERÍODO TEMPORAL:")
+            print(
+                f"Período analisado:                   {periodo.get('periodo_dias', 0)} dias"
+            )
+            if "data_mais_antiga" in periodo:
+                print(
+                    f"Data mais antiga:                    {periodo['data_mais_antiga']}"
+                )
+                print(
+                    f"Data mais recente:                   {periodo['data_mais_recente']}"
+                )
+
+        print("=" * 80)
 
     def process_batches_parallel(
         self, chain, tickets: list, token_limit: int = 50000
