@@ -14,33 +14,16 @@ import pickle
 
 
 class BaseProcessor:
-    # Padrões de sender que indicam mensagens AI/bot
+    # Padrões de sender que indicam mensagens AI/bot (em lowercase para eficiência)
     AI_SENDER_PATTERNS = [
         "ai",
-        "AI",
-        "Ai",
-        "aI",
-        "bot",
-        "BOT",
-        "Bot",
-        "BoT",
+        "bot", 
         "assistant",
-        "ASSISTANT",
-        "Assistant",
         "ai_assistant",
-        "AI_ASSISTANT",
         "chatbot",
-        "CHATBOT",
-        "ChatBot",
         "automated",
-        "AUTOMATED",
-        "Automated",
         "system",
-        "SYSTEM",
-        "System",
         "auto",
-        "AUTO",
-        "Auto",
     ]
 
     def __init__(
@@ -643,12 +626,12 @@ class BaseProcessor:
         for sender, count in sender_counts.items():
             print(f"   '{sender}': {count:,} mensagens")
 
-        # Filtra usando padrões robustos da constante da classe
+        # Filtra usando padrões robustos da constante da classe (já em lowercase)
         ai_mask = (
             df["sender"]
             .str.lower()
             .str.strip()
-            .isin([p.lower() for p in self.AI_SENDER_PATTERNS])
+            .isin(self.AI_SENDER_PATTERNS)
         )
         ai_messages_count = ai_mask.sum()
 
