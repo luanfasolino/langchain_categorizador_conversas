@@ -1189,6 +1189,12 @@ class BaseProcessor:
 
                 output_tokens = self.estimate_tokens(result)
 
+                # Registra no sistema de tracking de tokens (se disponível)
+                if hasattr(self, 'track_token_usage'):
+                    self.track_token_usage(
+                        processor_name, input_tokens, output_tokens, {"chunk_processed": True}
+                    )
+
                 # Prepara o resultado
                 processed_result = {
                     "result": result,

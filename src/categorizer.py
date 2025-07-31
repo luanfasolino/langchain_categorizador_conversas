@@ -735,32 +735,10 @@ class TicketCategorizer(BaseProcessor):
         # 1. Map: Analisa cada chunk usando cache inteligente (processamento paralelo otimizado)
         print("\n🔄 Fase MAP: Realizando análise dos chunks em paralelo com cache inteligente...")
         
-        # Função wrapper para preservar tracking e retry logic
-        def map_processor_with_tracking(text: str) -> str:
-            """
-            Função wrapper que processa um chunk com tracking de tokens.
-            Compatível com o sistema de cache do BaseProcessor.
-            """
-            # Estimativa de tokens de entrada
-            input_tokens = self.estimate_tokens(text)
-            
-            # Processa com LLM
-            analysis = map_chain.invoke({"text": text})
-            
-            # Estimativa de tokens de saída
-            output_tokens = self.estimate_tokens(analysis)
-            
-            # Registra no sistema de tracking - Task 1.5
-            tracking_result = self.track_token_usage(
-                "map", input_tokens, output_tokens, {"chunk_processed": True}
-            )
-            
-            return analysis
-        
-        # Usa sistema de cache inteligente do BaseProcessor
+        # Usa sistema de cache inteligente do BaseProcessor passando a chain diretamente
         try:
             partial_analyses, total_input_tokens, total_output_tokens = self.process_chunks_with_cache(
-                docs, map_processor_with_tracking, "map"
+                docs, map_chain, "map"
             )
 
             # Estatísticas de performance com cache inteligente
