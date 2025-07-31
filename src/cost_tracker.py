@@ -34,9 +34,9 @@ class TokenUsage:
     @property
     def cost_usd(self) -> float:
         """Calcula custo em USD baseado no pricing do Gemini 2.5 Flash."""
-        # Pricing Gemini 2.5 Flash: $0.125/1K input, $0.375/1K output
-        input_cost = (self.input_tokens / 1000) * 0.125
-        output_cost = (self.output_tokens / 1000) * 0.375
+        # Pricing Gemini 2.5 Flash: $0.075/1M input, $0.30/1M output
+        input_cost = (self.input_tokens / 1000000) * 0.075
+        output_cost = (self.output_tokens / 1000000) * 0.30
         return input_cost + output_cost
 
 
@@ -87,9 +87,9 @@ class CostTracker:
     - Relatórios e analytics
     """
 
-    # Pricing Gemini 2.5 Flash (USD per 1K tokens)
-    INPUT_TOKEN_PRICE = 0.125 / 1000  # $0.000125 per token
-    OUTPUT_TOKEN_PRICE = 0.375 / 1000  # $0.000375 per token
+    # Pricing Gemini 2.5 Flash (USD per 1M tokens)
+    INPUT_TOKEN_PRICE = 0.075 / 1000000  # $0.000000075 per token
+    OUTPUT_TOKEN_PRICE = 0.30 / 1000000  # $0.0000003 per token
 
     def __init__(self, storage_dir: Path = None, budget_limit_usd: float = None):
         """
