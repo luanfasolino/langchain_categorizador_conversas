@@ -5,9 +5,8 @@ Testes para o CacheReporter - Sistema de relatórios e monitoramento de cache.
 import pytest
 import tempfile
 import time
-import threading
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from src.cache_manager import CacheManager
 from src.cache_reporter import CacheReporter

@@ -90,7 +90,7 @@ class TestCacheParallelPerformance:
         total_items = sum(r["success_count"] for r in results)
         total_throughput = total_items / total_time
 
-        print(f"\n📊 PERFORMANCE DE ESCRITAS CONCORRENTES:")
+        print("\n📊 PERFORMANCE DE ESCRITAS CONCORRENTES:")
         print(f"   Threads: {num_threads}")
         print(f"   Items por thread: {items_per_thread}")
         print(f"   Total de items: {total_items}")
@@ -178,7 +178,7 @@ class TestCacheParallelPerformance:
         hit_rate = (total_hits / total_reads) * 100
         total_throughput = total_reads / total_time
 
-        print(f"\n📊 PERFORMANCE DE LEITURAS CONCORRENTES:")
+        print("\n📊 PERFORMANCE DE LEITURAS CONCORRENTES:")
         print(f"   Threads: {num_threads}")
         print(f"   Reads por thread: {reads_per_thread}")
         print(f"   Total de reads: {total_reads}")
@@ -261,7 +261,7 @@ class TestCacheParallelPerformance:
         total_operations = sum(sum(r["operations"].values()) for r in results)
         total_throughput = total_operations / total_time
 
-        print(f"\n📊 PERFORMANCE DE OPERAÇÕES MISTAS:")
+        print("\n📊 PERFORMANCE DE OPERAÇÕES MISTAS:")
         print(f"   Threads: {num_threads}")
         print(f"   Operações por thread: {operations_per_thread}")
         print(f"   Total de operações: {total_operations}")
@@ -329,7 +329,7 @@ class TestCacheParallelPerformance:
         # Valida resultados
         speedup = sequential_time / parallel_time
 
-        print(f"\n📊 PERFORMANCE DE CACHE WARMING:")
+        print("\n📊 PERFORMANCE DE CACHE WARMING:")
         print(f"   Items: {len(warmup_data)}")
         print(f"   Tempo sequencial: {sequential_time:.2f}s")
         print(f"   Tempo paralelo: {parallel_time:.2f}s ({num_workers} workers)")
@@ -350,7 +350,7 @@ class TestCacheParallelPerformance:
 
         # Verifica que todos os itens foram carregados
         loaded_count = 0
-        for key in warmup_data.keys():
+        for key in warmup_data:
             if cache_manager.get(key) is not None:
                 loaded_count += 1
 
@@ -425,7 +425,7 @@ class TestCacheParallelPerformance:
         total_errors = sum(r["errors"] for r in results)
         error_rate = (total_errors / (total_operations + total_errors)) * 100
 
-        print(f"\n📊 TESTE DE CONTENÇÃO:")
+        print("\n📊 TESTE DE CONTENÇÃO:")
         print(f"   Threads: {num_threads}")
         print(f"   Chaves compartilhadas: {len(shared_keys)}")
         print(f"   Operações por thread: {operations_per_thread}")
@@ -504,11 +504,11 @@ class TestCacheParallelPerformance:
         small_throughput = 25 / avg_small_time  # 25 items per thread
         large_throughput = 5 / avg_large_time  # 5 items per thread
 
-        print(f"\n📊 EFETIVIDADE DO CACHE EM MEMÓRIA:")
-        print(f"   Items pequenos (memory cache):")
+        print("\n📊 EFETIVIDADE DO CACHE EM MEMÓRIA:")
+        print("   Items pequenos (memory cache):")
         print(f"      Tempo médio: {avg_small_time:.3f}s")
         print(f"      Throughput: {small_throughput:.1f} items/s")
-        print(f"   Items grandes (disk cache):")
+        print("   Items grandes (disk cache):")
         print(f"      Tempo médio: {avg_large_time:.3f}s")
         print(f"      Throughput: {large_throughput:.1f} items/s")
         memory_speedup = small_throughput / large_throughput

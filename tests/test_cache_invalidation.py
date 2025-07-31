@@ -4,9 +4,6 @@ Testes específicos para invalidação de cache e geração de chaves avançada.
 
 import pytest
 import tempfile
-import time
-import hashlib
-import json
 from pathlib import Path
 
 from src.cache_manager import CacheManager
