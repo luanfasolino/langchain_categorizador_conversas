@@ -14,6 +14,35 @@ import pickle
 
 
 class BaseProcessor:
+    # Padrões de sender que indicam mensagens AI/bot
+    AI_SENDER_PATTERNS = [
+        "ai",
+        "AI",
+        "Ai",
+        "aI",
+        "bot",
+        "BOT",
+        "Bot",
+        "BoT",
+        "assistant",
+        "ASSISTANT",
+        "Assistant",
+        "ai_assistant",
+        "AI_ASSISTANT",
+        "chatbot",
+        "CHATBOT",
+        "ChatBot",
+        "automated",
+        "AUTOMATED",
+        "Automated",
+        "system",
+        "SYSTEM",
+        "System",
+        "auto",
+        "AUTO",
+        "Auto",
+    ]
+
     def __init__(
         self,
         api_key: str,
@@ -548,7 +577,7 @@ class BaseProcessor:
                     if i == len(csv_configs) - 1:
                         raise Exception(
                             f"Não foi possível carregar o arquivo CSV após {len(csv_configs)} tentativas"
-                        )
+                        ) from e
         else:
             print("📊 Detectado arquivo Excel, usando pd.read_excel()")
             try:
@@ -557,7 +586,7 @@ class BaseProcessor:
                 print(f"   Colunas detectadas: {list(df.columns)}")
                 return df
             except Exception as e:
-                raise Exception(f"Erro ao carregar arquivo Excel: {str(e)}")
+                raise Exception(f"Erro ao carregar arquivo Excel: {str(e)}") from e
 
     def _filter_by_category(self, df: pd.DataFrame) -> pd.DataFrame:
         """Filtra registros por category='TEXT' com validação robusta case-insensitive."""
@@ -608,44 +637,18 @@ class BaseProcessor:
 
     def _filter_ai_messages(self, df: pd.DataFrame) -> pd.DataFrame:
         """Filtra mensagens AI com detecção aprimorada de padrões."""
-        # Padrões de sender que indicam mensagens AI
-        ai_patterns = [
-            "ai",
-            "AI",
-            "Ai",
-            "aI",
-            "bot",
-            "BOT",
-            "Bot",
-            "BoT",
-            "assistant",
-            "ASSISTANT",
-            "Assistant",
-            "ai_assistant",
-            "AI_ASSISTANT",
-            "chatbot",
-            "CHATBOT",
-            "ChatBot",
-            "automated",
-            "AUTOMATED",
-            "Automated",
-            "system",
-            "SYSTEM",
-            "System",
-            "auto",
-            "AUTO",
-            "Auto",
-        ]
-
         # Log das categorias de sender encontradas
         sender_counts = df["sender"].value_counts()
         print("📨 Tipos de sender encontrados:")
         for sender, count in sender_counts.items():
             print(f"   '{sender}': {count:,} mensagens")
 
-        # Filtra usando padrões mais robustos
+        # Filtra usando padrões robustos da constante da classe
         ai_mask = (
-            df["sender"].str.lower().str.strip().isin([p.lower() for p in ai_patterns])
+            df["sender"]
+            .str.lower()
+            .str.strip()
+            .isin([p.lower() for p in self.AI_SENDER_PATTERNS])
         )
         ai_messages_count = ai_mask.sum()
 
