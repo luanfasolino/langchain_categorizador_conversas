@@ -35,12 +35,6 @@ class TicketCategorizer(BaseProcessor):
             max_output_tokens=8192,  # Permite respostas mais completas
             top_p=0.8,  # Controla diversidade de respostas
             top_k=40,  # Limita tokens considerados
-            safety_settings={
-                "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-                "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-                "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-                "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
-            },
         )
 
         # Configurações específicas para o modelo
@@ -176,10 +170,13 @@ class TicketCategorizer(BaseProcessor):
             )
 
         print(f"⚡ Total estimado de tokens: {total_tokens:,}")
-        print(f"📈 Média de tokens por chunk: {total_tokens // len(docs):,}")
-        print(
-            f"🎯 Start index tracking: {'Ativo' if docs[0].metadata.get('start_index') is not None else 'Inativo'}"
-        )
+        if len(docs) > 0:
+            print(f"📈 Média de tokens por chunk: {total_tokens // len(docs):,}")
+            print(
+                f"🎯 Start index tracking: {'Ativo' if docs[0].metadata.get('start_index') is not None else 'Inativo'}"
+            )
+        else:
+            print("⚠️  Nenhum chunk foi criado - verifique se há dados válidos para processar")
 
         return docs
 
