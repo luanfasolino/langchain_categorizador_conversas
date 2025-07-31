@@ -6,14 +6,12 @@ de forma integrada, usando os componentes reais do pipeline LangChain.
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from ticket_report_generator import TicketReportGenerator
-import pandas as pd
 import logging
 
 # Setup logging

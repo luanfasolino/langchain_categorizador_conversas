@@ -132,7 +132,7 @@ def main():
     )
     parser.add_argument(
         "--export-csv",
-        action="store_true", 
+        action="store_true",
         default=True,
         help="Exportar relatórios CSV (padrão: ativado)",
     )
@@ -202,13 +202,13 @@ def main():
 
         if args.mode in ["analyze", "all"]:
             print("\n📊 Iniciando análise dos resultados do pipeline...")
-            
+
             # Configurar opções de exportação
             export_reports = not args.no_export
             export_excel = args.export_excel and export_reports
             export_csv = args.export_csv and export_reports
             export_text = args.export_text and export_reports
-            
+
             # Inicializar o gerador de relatórios
             report_generator = TicketReportGenerator(
                 api_key=os.getenv("GOOGLE_API_KEY"),
@@ -216,47 +216,59 @@ def main():
                 max_workers=args.workers,
                 use_cache=use_cache,
             )
-            
+
             try:
                 # Processar resultados do pipeline
                 results = report_generator.process_pipeline_results(
                     export_reports=export_reports
                 )
-                
+
                 # Exibir resultados
                 print("\n" + "=" * 60)
                 print("📈 ANÁLISE DOS RESULTADOS DO PIPELINE")
                 print("=" * 60)
                 print(f"✅ Análise concluída com sucesso!")
                 print(f"📊 Total de tickets analisados: {results['total_tickets']:,}")
-                print(f"🏷️  Total de categorias encontradas: {results['total_categories']}")
-                
-                if export_reports and results['export_info']['total_files'] > 0:
+                print(
+                    f"🏷️  Total de categorias encontradas: {results['total_categories']}"
+                )
+
+                if export_reports and results["export_info"]["total_files"] > 0:
                     print(f"\n📁 Relatórios gerados:")
-                    print(f"   Total de arquivos: {results['export_info']['total_files']}")
-                    print(f"   Diretório: {results['export_info']['storage_directory']}")
-                    
-                    exported_files = results['export_info']['files_exported']
-                    if exported_files.get('excel'):
+                    print(
+                        f"   Total de arquivos: {results['export_info']['total_files']}"
+                    )
+                    print(
+                        f"   Diretório: {results['export_info']['storage_directory']}"
+                    )
+
+                    exported_files = results["export_info"]["files_exported"]
+                    if exported_files.get("excel"):
                         print(f"   📗 Excel: {len(exported_files['excel'])} arquivo(s)")
-                    if exported_files.get('csv'):
+                    if exported_files.get("csv"):
                         print(f"   📄 CSV: {len(exported_files['csv'])} arquivo(s)")
-                    if exported_files.get('text'):
+                    if exported_files.get("text"):
                         print(f"   📝 Texto: {len(exported_files['text'])} arquivo(s)")
-                
+
                 # Mostrar insights principais
-                analysis_data = results['analysis_data']
-                if 'category_analysis' in analysis_data:
-                    top_categories = analysis_data['category_analysis']['top_categories'][:5]
+                analysis_data = results["analysis_data"]
+                if "category_analysis" in analysis_data:
+                    top_categories = analysis_data["category_analysis"][
+                        "top_categories"
+                    ][:5]
                     print(f"\n🔝 Top 5 Categorias:")
                     for i, cat in enumerate(top_categories, 1):
-                        print(f"   {i}. {cat['category']}: {cat['count']:,} tickets ({cat['percentage']}%)")
-                
+                        print(
+                            f"   {i}. {cat['category']}: {cat['count']:,} tickets ({cat['percentage']}%)"
+                        )
+
                 print("=" * 60)
-                
+
             except FileNotFoundError as e:
                 print(f"\n❌ Erro: {str(e)}")
-                print("💡 Execute primeiro a categorização: python main.py --mode categorize")
+                print(
+                    "💡 Execute primeiro a categorização: python main.py --mode categorize"
+                )
             except Exception as e:
                 print(f"\n❌ Erro durante a análise: {str(e)}")
                 raise

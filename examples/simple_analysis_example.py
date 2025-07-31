@@ -155,7 +155,7 @@ def custom_analysis_example():
             # Individual sheets for each category
             for cat_info in top_5_categories:
                 category_name = cat_info["category"]
-                cat_df = df[df['categoria'] == category_name]
+                cat_df = filtered_df[filtered_df['categoria'] == category_name]
                 
                 # Clean sheet name (Excel has naming restrictions)
                 sheet_name = category_name.replace("/", "_").replace("\\", "_")[:31]

@@ -109,11 +109,12 @@ class ScalingThresholds:
 class PerformanceMonitor:
     """Monitors system and application performance for scaling decisions."""
 
-    def __init__(self, history_size: int = 1000):
+    def __init__(self, history_size: int = 1000, metrics_callback: Optional[Callable[[], Dict[str, Any]]] = None):
         self.metrics_history: deque = deque(maxlen=history_size)
         self.monitoring_active = False
         self.monitor_thread = None
         self.monitor_interval = 30  # seconds
+        self.metrics_callback = metrics_callback
 
     def start_monitoring(self):
         """Start performance monitoring."""
@@ -153,16 +154,29 @@ class PerformanceMonitor:
         memory_usage_percent = memory.percent
         memory_available_gb = memory.available / (1024**3)
 
-        # Application metrics (would be provided by the actual application)
-        # For now, using placeholder values
-        queue_depth = 0  # Would be actual queue depth
-        active_workers = 0  # Would be actual worker count
-        throughput = 0.0  # Would be actual throughput
-        error_rate = 0.0  # Would be actual error rate
-        avg_duration = 0.0  # Would be actual average task duration
-        pending_tasks = 0
-        completed_tasks = 0
-        failed_tasks = 0
+        # Application metrics (provided by callback or default values)
+        if self.metrics_callback:
+            try:
+                app_metrics = self.metrics_callback()
+                queue_depth = app_metrics.get('queue_depth', 0)
+                active_workers = app_metrics.get('active_workers', 0)
+                throughput = app_metrics.get('throughput', 0.0)
+                error_rate = app_metrics.get('error_rate', 0.0)
+                avg_duration = app_metrics.get('avg_task_duration_seconds', 0.0)
+                pending_tasks = app_metrics.get('pending_tasks', 0)
+                completed_tasks = app_metrics.get('completed_tasks', 0)
+                failed_tasks = app_metrics.get('failed_tasks', 0)
+                logger.debug("Application metrics collected via callback")
+            except Exception as e:
+                logger.warning(f"Failed to collect application metrics: {str(e)}")
+                # Fall back to default values
+                queue_depth = active_workers = throughput = error_rate = avg_duration = 0
+                pending_tasks = completed_tasks = failed_tasks = 0
+        else:
+            # Default placeholder values when no callback is provided
+            logger.debug("Using default placeholder metrics (no callback provided)")
+            queue_depth = active_workers = throughput = error_rate = avg_duration = 0
+            pending_tasks = completed_tasks = failed_tasks = 0
 
         return ScalingMetrics(
             timestamp=datetime.now(),
@@ -632,9 +646,10 @@ class AutoScaler:
 
         logger.info(f"AutoScaler initialized with {initial_workers} workers")
 
-    def set_metrics_provider(self, provider: Callable[[], ScalingMetrics]):
+    def set_metrics_provider(self, provider: Callable[[], Dict[str, Any]]):
         """Set callback function to provide application-specific metrics."""
         self.metrics_provider = provider
+        self.monitor.metrics_callback = provider
 
     def set_scaling_callback(self, callback: Callable[[int, int], bool]):
         """Set callback function to notify application of scaling events."""
@@ -644,6 +659,14 @@ class AutoScaler:
         """Start the auto-scaling system."""
         if self.auto_scaling_active:
             return
+
+        # Warn if no metrics provider is set
+        if not self.metrics_provider:
+            logger.warning(
+                "AutoScaler starting without real application metrics. "
+                "Scaling decisions will be based only on system metrics (CPU, memory). "
+                "Use set_metrics_provider() to provide queue depth, throughput, and error rate metrics."
+            )
 
         self.auto_scaling_active = True
         self.monitor.start_monitoring()
