@@ -220,7 +220,10 @@ def main():
             try:
                 # Processar resultados do pipeline
                 results = report_generator.process_pipeline_results(
-                    export_reports=export_reports
+                    export_reports=export_reports,
+                    export_excel=export_excel,
+                    export_csv=export_csv,
+                    export_text=export_text,
                 )
 
                 # Exibir resultados

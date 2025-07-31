@@ -59,6 +59,7 @@ class ScalingMetrics:
     pending_tasks: int
     completed_tasks: int
     failed_tasks: int
+    has_real_application_metrics: bool = False
 
 
 @dataclass
@@ -109,7 +110,11 @@ class ScalingThresholds:
 class PerformanceMonitor:
     """Monitors system and application performance for scaling decisions."""
 
-    def __init__(self, history_size: int = 1000, metrics_callback: Optional[Callable[[], Dict[str, Any]]] = None):
+    def __init__(
+        self,
+        history_size: int = 1000,
+        metrics_callback: Optional[Callable[[], Dict[str, Any]]] = None,
+    ):
         self.metrics_history: deque = deque(maxlen=history_size)
         self.monitoring_active = False
         self.monitor_thread = None
@@ -154,29 +159,57 @@ class PerformanceMonitor:
         memory_usage_percent = memory.percent
         memory_available_gb = memory.available / (1024**3)
 
-        # Application metrics (provided by callback or default values)
+        # Application metrics (provided by callback or safe defaults)
+        has_real_metrics = False
         if self.metrics_callback:
             try:
                 app_metrics = self.metrics_callback()
-                queue_depth = app_metrics.get('queue_depth', 0)
-                active_workers = app_metrics.get('active_workers', 0)
-                throughput = app_metrics.get('throughput', 0.0)
-                error_rate = app_metrics.get('error_rate', 0.0)
-                avg_duration = app_metrics.get('avg_task_duration_seconds', 0.0)
-                pending_tasks = app_metrics.get('pending_tasks', 0)
-                completed_tasks = app_metrics.get('completed_tasks', 0)
-                failed_tasks = app_metrics.get('failed_tasks', 0)
-                logger.debug("Application metrics collected via callback")
+                queue_depth = app_metrics.get("queue_depth", 0)
+                active_workers = app_metrics.get("active_workers", 0)
+                throughput = app_metrics.get("throughput", 0.0)
+                error_rate = app_metrics.get("error_rate", 0.0)
+                avg_duration = app_metrics.get("avg_task_duration_seconds", 0.0)
+                pending_tasks = app_metrics.get("pending_tasks", 0)
+                completed_tasks = app_metrics.get("completed_tasks", 0)
+                failed_tasks = app_metrics.get("failed_tasks", 0)
+
+                # Check if we have any non-zero application metrics (indicating real data)
+                has_real_metrics = any(
+                    [
+                        queue_depth > 0,
+                        active_workers > 0,
+                        throughput > 0.0,
+                        error_rate > 0.0,
+                        pending_tasks > 0,
+                        completed_tasks > 0,
+                    ]
+                )
+
+                if has_real_metrics:
+                    logger.debug("Real application metrics collected via callback")
+                else:
+                    logger.debug("Callback provided but returned all zero values")
+
             except Exception as e:
                 logger.warning(f"Failed to collect application metrics: {str(e)}")
-                # Fall back to default values
-                queue_depth = active_workers = throughput = error_rate = avg_duration = 0
+                # Fall back to safe defaults
+                queue_depth = active_workers = throughput = error_rate = (
+                    avg_duration
+                ) = 0
                 pending_tasks = completed_tasks = failed_tasks = 0
+                has_real_metrics = False
         else:
-            # Default placeholder values when no callback is provided
-            logger.debug("Using default placeholder metrics (no callback provided)")
-            queue_depth = active_workers = throughput = error_rate = avg_duration = 0
-            pending_tasks = completed_tasks = failed_tasks = 0
+            # Safe defaults when no callback is provided - use conservative values
+            logger.debug("No metrics callback provided - using conservative defaults")
+            queue_depth = 0  # No queue pressure
+            active_workers = 1  # Assume minimal workers
+            throughput = 1.0  # Assume some baseline throughput
+            error_rate = 0.0  # No errors
+            avg_duration = 1.0  # Assume 1 second per task
+            pending_tasks = 0
+            completed_tasks = 0
+            failed_tasks = 0
+            has_real_metrics = False
 
         return ScalingMetrics(
             timestamp=datetime.now(),
@@ -191,6 +224,7 @@ class PerformanceMonitor:
             pending_tasks=pending_tasks,
             completed_tasks=completed_tasks,
             failed_tasks=failed_tasks,
+            has_real_application_metrics=has_real_metrics,
         )
 
     def get_current_metrics(self) -> Optional[ScalingMetrics]:
@@ -279,6 +313,51 @@ class ScalingDecisionEngine:
         Returns:
             Tuple of (action, trigger, trigger_value)
         """
+        # Check if we have real application metrics for scaling decisions
+        has_real_metrics = getattr(
+            current_metrics, "has_real_application_metrics", False
+        )
+
+        if not has_real_metrics:
+            # Without real application metrics, be very conservative
+            # Only scale based on severe system resource pressure
+            if current_metrics.cpu_usage_percent > 90.0:
+                logger.info(
+                    "Scaling up based on high CPU usage (no application metrics available)"
+                )
+                return (
+                    ScalingAction.SCALE_UP,
+                    ScalingTrigger.CPU_USAGE,
+                    current_metrics.cpu_usage_percent,
+                )
+            elif current_metrics.memory_usage_percent > 90.0:
+                logger.info(
+                    "Scaling up based on high memory usage (no application metrics available)"
+                )
+                return (
+                    ScalingAction.SCALE_UP,
+                    ScalingTrigger.MEMORY_PRESSURE,
+                    current_metrics.memory_usage_percent,
+                )
+            elif (
+                current_metrics.cpu_usage_percent < 20.0
+                and current_metrics.memory_usage_percent < 30.0
+                and current_workers > self.thresholds.min_workers
+            ):
+                logger.info(
+                    "Scaling down based on low resource usage (no application metrics available)"
+                )
+                return (
+                    ScalingAction.SCALE_DOWN,
+                    ScalingTrigger.CPU_USAGE,
+                    current_metrics.cpu_usage_percent,
+                )
+            else:
+                return ScalingAction.MAINTAIN, ScalingTrigger.MANUAL_TRIGGER, 0.0
+
+        # With real metrics, proceed with normal scaling logic
+        logger.debug("Using full scaling analysis with real application metrics")
+
         # Emergency scaling checks (immediate action needed)
         emergency_action = self._check_emergency_scaling(
             current_metrics, current_workers
@@ -587,9 +666,27 @@ class WorkerPoolManager:
                 return True
 
             try:
-                # Shutdown current executor
+                # Gracefully shutdown current executor to avoid data loss
                 if self.executor:
-                    self.executor.shutdown(wait=False)
+                    logger.info(
+                        f"Gracefully shutting down executor to scale from {self.current_workers} to {target_workers} workers"
+                    )
+                    # Give running tasks a chance to complete (up to 30 seconds)
+                    self.executor.shutdown(wait=True)
+
+                    # If shutdown takes too long, we'll need to force it
+                    import threading
+
+                    shutdown_timeout = 30.0
+                    start_time = time.time()
+
+                    # Check if shutdown completed in reasonable time
+                    if time.time() - start_time > shutdown_timeout:
+                        logger.warning(
+                            f"Executor shutdown took longer than {shutdown_timeout}s, some tasks may be lost"
+                        )
+                    else:
+                        logger.info("Executor shutdown completed gracefully")
 
                 # Create new executor with target workers
                 self.current_workers = target_workers
@@ -723,14 +820,38 @@ class AutoScaler:
             )
 
     def _get_current_metrics(self) -> Optional[ScalingMetrics]:
-        """Get current metrics from monitor or application callback."""
-        if self.metrics_provider:
+        """Get current metrics from monitor, ensuring they're safe for scaling decisions."""
+        metrics = None
+
+        # Try to get metrics from monitor first (it has our safety checks)
+        metrics = self.monitor.get_current_metrics()
+
+        # If we have a metrics provider callback, try to use it for more accurate data
+        if self.metrics_provider and metrics:
             try:
-                return self.metrics_provider()
+                provider_metrics = self.metrics_provider()
+                # Only use provider metrics if they appear to be real (non-zero)
+                if (
+                    hasattr(provider_metrics, "has_real_application_metrics")
+                    and provider_metrics.has_real_application_metrics
+                ):
+                    metrics = provider_metrics
+                    logger.debug("Using real metrics from provider")
+                else:
+                    logger.debug(
+                        "Provider metrics appear to be placeholder, using monitor metrics"
+                    )
             except Exception as e:
                 logger.error(f"Error getting metrics from provider: {str(e)}")
 
-        return self.monitor.get_current_metrics()
+        # Add safety check - if metrics don't have real application data,
+        # be conservative about scaling decisions
+        if metrics and not getattr(metrics, "has_real_application_metrics", False):
+            logger.debug(
+                "Metrics contain placeholder application data - scaling will be conservative"
+            )
+
+        return metrics
 
     def _execute_scaling_action(
         self,

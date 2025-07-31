@@ -6,12 +6,12 @@ categorization results produced by the TicketCategorizer and TicketSummarizer pi
 """
 
 import pandas as pd
+import numpy as np
 import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from datetime import datetime
-from collections import Counter
 from base_processor import BaseProcessor
 
 logger = logging.getLogger(__name__)
@@ -255,7 +255,6 @@ class TicketReportGenerator(BaseProcessor):
 
     def _calculate_category_diversity(self, category_counts: pd.Series) -> float:
         """Calculate Shannon diversity index for categories."""
-        import numpy as np
 
         proportions = category_counts / category_counts.sum()
         shannon_entropy = -np.sum(
@@ -698,7 +697,7 @@ class TicketReportGenerator(BaseProcessor):
 
             # Quality metrics
             quality = analysis["quality_metrics"]
-            f.write(f"\nQUALITY METRICS:\n")
+            f.write("\nQUALITY METRICS:\n")
             f.write("-" * 40 + "\n")
             f.write(
                 f"Data Completeness: {quality['data_completeness']['completeness_rate']}%\n"
@@ -808,6 +807,9 @@ class TicketReportGenerator(BaseProcessor):
         categorized_file: Optional[Path] = None,
         export_reports: bool = True,
         filename_base: Optional[str] = None,
+        export_excel: bool = True,
+        export_csv: bool = True,
+        export_text: bool = True,
     ) -> Dict[str, Any]:
         """
         Main method to process pipeline results and generate reports.
@@ -816,6 +818,9 @@ class TicketReportGenerator(BaseProcessor):
             categorized_file: Path to categorized tickets file
             export_reports: Whether to export reports
             filename_base: Base filename for exports
+            export_excel: Export Excel report (only if export_reports=True)
+            export_csv: Export CSV files (only if export_reports=True)
+            export_text: Export text summary (only if export_reports=True)
 
         Returns:
             Complete analysis results and export information
@@ -847,7 +852,12 @@ class TicketReportGenerator(BaseProcessor):
             # Export reports if requested
             if export_reports:
                 exported_files = self.export_comprehensive_reports(
-                    analysis, categorized_df, filename_base
+                    analysis,
+                    categorized_df,
+                    filename_base,
+                    export_excel=export_excel,
+                    export_csv=export_csv,
+                    export_text=export_text,
                 )
 
                 result["export_info"] = {
@@ -864,7 +874,3 @@ class TicketReportGenerator(BaseProcessor):
         except Exception as e:
             logger.error(f"Error processing pipeline results: {str(e)}")
             raise
-
-
-# Import numpy for statistical calculations
-import numpy as np
