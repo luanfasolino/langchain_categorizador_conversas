@@ -13,8 +13,10 @@ import hashlib
 
 try:
     from .cache_manager import CacheManager
+    from .cost_tracker import CostTracker
 except ImportError:
     from cache_manager import CacheManager
+    from cost_tracker import CostTracker
 
 
 class BaseProcessor:
@@ -39,6 +41,8 @@ class BaseProcessor:
         use_cache: bool = True,
         cache_size_mb: int = 1024,  # 1GB padrão
         enable_cache_compression: bool = True,
+        enable_cost_tracking: bool = True,
+        budget_limit_usd: float = None,
     ):
         self.database_dir = database_dir
         self.max_tickets_per_batch = max_tickets_per_batch
@@ -64,6 +68,16 @@ class BaseProcessor:
             )
         else:
             self.cache_manager = None
+
+        # Inicializa o sistema de cost tracking
+        self.enable_cost_tracking = enable_cost_tracking
+        if self.enable_cost_tracking:
+            self.cost_tracker = CostTracker(
+                storage_dir=self.database_dir / "cost_tracking",
+                budget_limit_usd=budget_limit_usd,
+            )
+        else:
+            self.cost_tracker = None
 
         # Inicializa o modelo
         self.llm = ChatGoogleGenerativeAI(
@@ -487,6 +501,55 @@ class BaseProcessor:
         if self.cache_manager:
             return self.cache_manager.cleanup_old_files(max_age_hours)
         return 0
+
+    # Cost tracking methods
+    def start_cost_tracking_session(
+        self, session_id: str, dataset_size: int = 0, processing_mode: str = "unknown"
+    ) -> str:
+        """Inicia sessão de tracking de custos."""
+        if self.cost_tracker:
+            return self.cost_tracker.start_session(
+                session_id, dataset_size, processing_mode
+            )
+        return session_id
+
+    def end_cost_tracking_session(self):
+        """Finaliza sessão de tracking de custos."""
+        if self.cost_tracker:
+            return self.cost_tracker.end_session()
+        return None
+
+    def track_operation_cost(
+        self,
+        input_text: str,
+        output_text: str,
+        operation_type: str = "unknown",
+        phase: str = "unknown",
+    ):
+        """Registra custo de uma operação."""
+        if self.cost_tracker:
+            return self.cost_tracker.track_text_operation(
+                input_text, output_text, operation_type, phase
+            )
+        return None
+
+    def get_cost_statistics(self) -> Dict[str, Any]:
+        """Retorna estatísticas de custo."""
+        if self.cost_tracker:
+            return self.cost_tracker.get_current_session_stats()
+        return {}
+
+    def get_cost_trends(self, hours_back: int = 24) -> Dict[str, Any]:
+        """Retorna tendências de custo."""
+        if self.cost_tracker:
+            return self.cost_tracker.get_cost_trends(hours_back)
+        return {}
+
+    def export_cost_report(self, filename: str = None) -> Path:
+        """Exporta relatório de custos."""
+        if self.cost_tracker:
+            return self.cost_tracker.export_cost_report_csv(filename)
+        return None
 
     def prepare_data(self, input_file: Path, nrows: int = None) -> List[dict]:
         """Prepara os dados do arquivo de entrada com suporte a cache e validação aprimorada."""
