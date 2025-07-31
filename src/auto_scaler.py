@@ -675,8 +675,6 @@ class WorkerPoolManager:
                     self.executor.shutdown(wait=True)
 
                     # If shutdown takes too long, we'll need to force it
-                    import threading
-
                     shutdown_timeout = 30.0
                     start_time = time.time()
 

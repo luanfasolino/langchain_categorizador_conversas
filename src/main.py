@@ -126,19 +126,19 @@ def main():
     )
     parser.add_argument(
         "--export-excel",
-        action="store_true",
+        type=bool,
         default=True,
         help="Exportar relatório Excel (padrão: ativado)",
     )
     parser.add_argument(
         "--export-csv",
-        action="store_true",
+        type=bool,
         default=True,
         help="Exportar relatórios CSV (padrão: ativado)",
     )
     parser.add_argument(
         "--export-text",
-        action="store_true",
+        type=bool,
         default=True,
         help="Exportar relatório de texto (padrão: ativado)",
     )
