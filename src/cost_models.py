@@ -883,3 +883,18 @@ class CostAnalyticsEngine:
                 "Cost-efficiency optimization",
             ],
         }
+
+    def get_session_summary(self) -> Dict[str, Any]:
+        """Get current session cost summary.
+        
+        Returns basic cost tracking information. For real-time session tracking,
+        this should be integrated with the cost_tracker module.
+        """
+        return {
+            "total_cost_usd": 0.0,  # Would integrate with actual cost tracker
+            "cost_per_item": 0.0,
+            "total_tokens": 0,
+            "operations_count": 0,
+            "session_active": False,
+            "note": "Basic cost tracking - integrate with cost_tracker for real-time data"
+        }
