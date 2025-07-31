@@ -5,6 +5,7 @@ import argparse
 from categorizer import TicketCategorizer
 from summarizer import TicketSummarizer
 from merger import TicketDataMerger
+from ticket_report_generator import TicketReportGenerator
 
 
 def get_available_files(database_dir):
@@ -96,7 +97,7 @@ def main():
     parser = argparse.ArgumentParser(description="Processa tickets de suporte.")
     parser.add_argument(
         "--mode",
-        choices=["categorize", "summarize", "merge", "all"],
+        choices=["categorize", "summarize", "merge", "analyze", "all"],
         required=True,
         help="Modo de execução",
     )
@@ -123,18 +124,45 @@ def main():
         default=None,
         help="Caminho para o arquivo de entrada (CSV ou Excel)",
     )
+    parser.add_argument(
+        "--export-excel",
+        type=bool,
+        default=True,
+        help="Exportar relatório Excel (padrão: ativado)",
+    )
+    parser.add_argument(
+        "--export-csv",
+        type=bool,
+        default=True,
+        help="Exportar relatórios CSV (padrão: ativado)",
+    )
+    parser.add_argument(
+        "--export-text",
+        type=bool,
+        default=True,
+        help="Exportar relatório de texto (padrão: ativado)",
+    )
+    parser.add_argument(
+        "--no-export",
+        action="store_true",
+        help="Desativar todas as exportações (apenas análise)",
+    )
     args = parser.parse_args()
 
     load_dotenv()
     DATABASE_DIR = Path(__file__).parent.parent / "database"
     DATABASE_DIR.mkdir(exist_ok=True)
 
-    # Seleciona o arquivo de entrada
-    input_file = select_input_file(DATABASE_DIR, args.input_file)
+    # Para o modo analyze, o input file é opcional (usa arquivos do pipeline)
+    if args.mode == "analyze":
+        input_file = None  # Será detectado automaticamente pelo TicketReportGenerator
+    else:
+        # Seleciona o arquivo de entrada para outros modos
+        input_file = select_input_file(DATABASE_DIR, args.input_file)
 
-    if not input_file:
-        print("\n❌ Nenhum arquivo foi selecionado. Operação cancelada.")
-        return
+        if not input_file:
+            print("\n❌ Nenhum arquivo foi selecionado. Operação cancelada.")
+            return
 
     # Define se deve usar cache ou não
     use_cache = not args.no_cache
@@ -171,6 +199,82 @@ def main():
             merger = TicketDataMerger(DATABASE_DIR)
             final_file = merger.merge_results(categories_file, summaries_file)
             print(f"Arquivo final gerado: {final_file}")
+
+        if args.mode in ["analyze", "all"]:
+            print("\n📊 Iniciando análise dos resultados do pipeline...")
+
+            # Configurar opções de exportação
+            export_reports = not args.no_export
+            export_excel = args.export_excel and export_reports
+            export_csv = args.export_csv and export_reports
+            export_text = args.export_text and export_reports
+
+            # Inicializar o gerador de relatórios
+            report_generator = TicketReportGenerator(
+                api_key=os.getenv("GOOGLE_API_KEY"),
+                database_dir=DATABASE_DIR,
+                max_workers=args.workers,
+                use_cache=use_cache,
+            )
+
+            try:
+                # Processar resultados do pipeline
+                results = report_generator.process_pipeline_results(
+                    export_reports=export_reports,
+                    export_excel=export_excel,
+                    export_csv=export_csv,
+                    export_text=export_text,
+                )
+
+                # Exibir resultados
+                print("\n" + "=" * 60)
+                print("📈 ANÁLISE DOS RESULTADOS DO PIPELINE")
+                print("=" * 60)
+                print(f"✅ Análise concluída com sucesso!")
+                print(f"📊 Total de tickets analisados: {results['total_tickets']:,}")
+                print(
+                    f"🏷️  Total de categorias encontradas: {results['total_categories']}"
+                )
+
+                if export_reports and results["export_info"]["total_files"] > 0:
+                    print(f"\n📁 Relatórios gerados:")
+                    print(
+                        f"   Total de arquivos: {results['export_info']['total_files']}"
+                    )
+                    print(
+                        f"   Diretório: {results['export_info']['storage_directory']}"
+                    )
+
+                    exported_files = results["export_info"]["files_exported"]
+                    if exported_files.get("excel"):
+                        print(f"   📗 Excel: {len(exported_files['excel'])} arquivo(s)")
+                    if exported_files.get("csv"):
+                        print(f"   📄 CSV: {len(exported_files['csv'])} arquivo(s)")
+                    if exported_files.get("text"):
+                        print(f"   📝 Texto: {len(exported_files['text'])} arquivo(s)")
+
+                # Mostrar insights principais
+                analysis_data = results["analysis_data"]
+                if "category_analysis" in analysis_data:
+                    top_categories = analysis_data["category_analysis"][
+                        "top_categories"
+                    ][:5]
+                    print(f"\n🔝 Top 5 Categorias:")
+                    for i, cat in enumerate(top_categories, 1):
+                        print(
+                            f"   {i}. {cat['category']}: {cat['count']:,} tickets ({cat['percentage']}%)"
+                        )
+
+                print("=" * 60)
+
+            except FileNotFoundError as e:
+                print(f"\n❌ Erro: {str(e)}")
+                print(
+                    "💡 Execute primeiro a categorização: python main.py --mode categorize"
+                )
+            except Exception as e:
+                print(f"\n❌ Erro durante a análise: {str(e)}")
+                raise
 
     except Exception as e:
         print(f"Erro durante o processamento: {str(e)}")
