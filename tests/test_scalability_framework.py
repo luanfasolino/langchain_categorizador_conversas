@@ -12,9 +12,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 # Import modules to test
-import sys
-
-sys.path.append(str(Path(__file__).parent.parent / "src"))
+# Note: Tests should be run with PYTHONPATH=src environment variable
+# Example: PYTHONPATH=src python -m pytest tests/
+# Or use proper package structure with __init__.py files
 
 from scalability_framework import ScalabilityFramework, ScalabilityConfiguration
 from scalability_manager import ScalabilityManager
@@ -484,8 +484,13 @@ class TestErrorHandling:
             # Test with non-existent file
             invalid_file = Path("/nonexistent/file.csv")
 
-            with pytest.raises(Exception):
+            # Use specific exception types for better error handling
+            with pytest.raises((FileNotFoundError, ValueError, OSError)) as exc_info:
                 framework.analyze_dataset_requirements(invalid_file)
+            
+            # Verify the error is related to file access
+            error_msg = str(exc_info.value).lower()
+            assert any(keyword in error_msg for keyword in ["file", "not found", "does not exist", "no such file"])
 
         finally:
             framework.cleanup()

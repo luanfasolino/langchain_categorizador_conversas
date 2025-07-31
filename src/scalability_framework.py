@@ -579,12 +579,32 @@ class ScalabilityFramework:
 
     def _get_current_cost_tracking(self) -> Dict[str, Any]:
         """Get current cost tracking information."""
-        return {
-            "session_id": self.current_session,
-            "estimated_session_cost": 0.0,  # Would be actual cost tracking
-            "cost_per_item": 0.0,
-            "budget_utilization_percent": 0.0,
-        }
+        try:
+            # Get actual cost tracking from cost analytics engine
+            cost_analysis = self.cost_analytics.get_session_summary()
+            
+            # Calculate budget utilization if budget limit is set
+            budget_utilization = 0.0
+            if self.config.budget_limit_usd and cost_analysis.get("total_cost_usd", 0) > 0:
+                budget_utilization = (cost_analysis["total_cost_usd"] / self.config.budget_limit_usd) * 100
+            
+            return {
+                "session_id": self.current_session,
+                "estimated_session_cost": cost_analysis.get("total_cost_usd", 0.0),
+                "cost_per_item": cost_analysis.get("cost_per_item", 0.0),
+                "budget_utilization_percent": budget_utilization,
+                "total_tokens": cost_analysis.get("total_tokens", 0),
+                "operations_count": cost_analysis.get("operations_count", 0),
+            }
+        except Exception as e:
+            # Fallback to basic tracking if cost analytics not available
+            return {
+                "session_id": self.current_session,
+                "estimated_session_cost": 0.0,
+                "cost_per_item": 0.0,
+                "budget_utilization_percent": 0.0,
+                "error": f"Cost tracking unavailable: {str(e)}",
+            }
 
     def _save_analysis(self, analysis: Dict[str, Any], file_path: Path):
         """Save analysis results to storage."""
