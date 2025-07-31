@@ -343,16 +343,15 @@ class ScalingDecisionEngine:
         if (
             metrics.queue_depth > self.thresholds.queue_scale_up_threshold
             and trends.get("queue_trend") in ["increasing", "stable"]
-        ):
-
-            if self._check_cooldown(
+            and self._check_cooldown(
                 ScalingTrigger.QUEUE_DEPTH, self.thresholds.scale_up_delay_seconds
-            ):
-                return (
-                    ScalingAction.SCALE_UP,
-                    ScalingTrigger.QUEUE_DEPTH,
-                    metrics.queue_depth,
-                )
+            )
+        ):
+            return (
+                ScalingAction.SCALE_UP,
+                ScalingTrigger.QUEUE_DEPTH,
+                metrics.queue_depth,
+            )
 
         return ScalingAction.MAINTAIN, ScalingTrigger.QUEUE_DEPTH, metrics.queue_depth
 
@@ -363,16 +362,15 @@ class ScalingDecisionEngine:
         if (
             metrics.queue_depth < self.thresholds.queue_scale_down_threshold
             and trends.get("queue_trend") in ["decreasing", "stable"]
-        ):
-
-            if self._check_cooldown(
+            and self._check_cooldown(
                 ScalingTrigger.QUEUE_DEPTH, self.thresholds.scale_down_delay_seconds
-            ):
-                return (
-                    ScalingAction.SCALE_DOWN,
-                    ScalingTrigger.QUEUE_DEPTH,
-                    metrics.queue_depth,
-                )
+            )
+        ):
+            return (
+                ScalingAction.SCALE_DOWN,
+                ScalingTrigger.QUEUE_DEPTH,
+                metrics.queue_depth,
+            )
 
         return ScalingAction.MAINTAIN, ScalingTrigger.QUEUE_DEPTH, metrics.queue_depth
 

@@ -9,10 +9,7 @@ import pytest
 import tempfile
 import pandas as pd
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import json
-import time
-from datetime import datetime, timedelta
+from unittest.mock import patch
 
 # Import modules to test
 import sys
@@ -20,7 +17,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from scalability_framework import ScalabilityFramework, ScalabilityConfiguration
-from scalability_manager import ScalabilityManager, ResourceProfile, ScalingMetrics
+from scalability_manager import ScalabilityManager
 from streaming_processor import (
     StreamingDataProcessor,
     StreamingConfig,
@@ -32,7 +29,7 @@ from resource_allocator import (
     AllocationRecommendation,
 )
 from cost_models import CostCalculator, LinearScalingModel, CostOptimizer
-from auto_scaler import AutoScaler, ScalingThresholds, ScalingAction, ScalingTrigger
+from auto_scaler import AutoScaler, ScalingThresholds
 
 
 class TestScalabilityManager:

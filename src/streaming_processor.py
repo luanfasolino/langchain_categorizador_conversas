@@ -93,10 +93,7 @@ class ChunkedFileReader:
         logger.info(f"Reading CSV in chunks of {chunksize:,} rows from {file_path}")
 
         try:
-            chunk_count = 0
-            for chunk in pd.read_csv(file_path, **pandas_args):
-                chunk_count += 1
-
+            for chunk_count, chunk in enumerate(pd.read_csv(file_path, **pandas_args), 1):
                 # Memory management
                 current_memory = self.memory_monitor.get_current_usage_mb()
                 logger.debug(
@@ -335,10 +332,7 @@ class StreamingDataProcessor:
 
         try:
             all_results = []
-            chunk_count = 0
-
-            for chunk_result in result_generator:
-                chunk_count += 1
+            for chunk_count, chunk_result in enumerate(result_generator, 1):
                 all_results.append(chunk_result)
 
                 # Periodic merge to manage memory

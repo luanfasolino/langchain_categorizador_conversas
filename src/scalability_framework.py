@@ -244,10 +244,6 @@ class ScalabilityFramework:
             # Process with streaming and scaling
             processing_start_time = datetime.now()
 
-            # Create adapted processor function
-            def adapted_processor(chunk, chunk_index):
-                return processor_function(chunk, chunk_index)
-
             # Process using streaming
             results = []
             total_processed = 0
@@ -255,7 +251,7 @@ class ScalabilityFramework:
             try:
                 for chunk_result in streaming_processor.process_file_streaming(
                     input_file=input_file,
-                    processor_function=adapted_processor,
+                    processor_function=processor_function,
                     output_file=output_file,
                     nrows=nrows,
                 ):

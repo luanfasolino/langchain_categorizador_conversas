@@ -79,7 +79,7 @@ def demo_basic_analysis():
     try:
         analysis = framework.analyze_dataset_requirements(dummy_file)
         
-        print(f"\n📊 Analysis Results:")
+        print("\n📊 Analysis Results:")
         print(f"Recommended workers: {analysis['recommended_configuration']['workers']}")
         print(f"Estimated duration: {analysis['recommended_configuration']['estimated_duration_minutes']:.1f} minutes")
         print(f"Estimated cost: ${analysis['recommended_configuration']['estimated_cost']:.2f}")
@@ -91,7 +91,7 @@ def demo_basic_analysis():
             for issue in analysis['validation']['issues']:
                 print(f"  - {issue}")
         
-        print(f"\n💡 Framework Recommendations:")
+        print("\n💡 Framework Recommendations:")
         for rec in analysis['framework_recommendations']:
             print(f"  - {rec}")
         
@@ -141,20 +141,20 @@ def demo_scalable_processing():
             enable_monitoring=True
         )
         
-        print(f"\n📈 Processing Results:")
+        print("\n📈 Processing Results:")
         print(f"Session ID: {results['session_id']}")
         print(f"Processing duration: {results['processing_duration']}")
         print(f"Items processed: {results['total_items_processed']:,}")
         print(f"Chunks processed: {results['chunks_processed']}")
         
-        print(f"\n💾 Streaming Statistics:")
+        print("\n💾 Streaming Statistics:")
         streaming_stats = results['streaming_stats']
         print(f"Memory usage: {streaming_stats['memory_usage']['current_mb']:.1f}MB")
         print(f"Peak memory: {streaming_stats['memory_usage']['peak_mb']:.1f}MB")
         print(f"Temp files: {streaming_stats['temp_files']['count']}")
         
         if results.get('auto_scaling_stats'):
-            print(f"\n🔄 Auto-scaling Statistics:")
+            print("\n🔄 Auto-scaling Statistics:")
             auto_stats = results['auto_scaling_stats']
             print(f"Final worker count: {auto_stats['current_status']['current_workers']}")
             print(f"Scaling events: {auto_stats['scaling_history']['total_events']}")
@@ -191,25 +191,25 @@ def demo_constraint_optimization():
         
         optimization = framework.optimize_for_constraints(dataset_size, constraints)
         
-        print(f"\n💰 Budget Optimization:")
+        print("\n💰 Budget Optimization:")
         if "budget_optimization" in optimization["individual_optimizations"]:
             budget_opt = optimization["individual_optimizations"]["budget_optimization"]
             print(f"  Recommended workers: {budget_opt.get('recommended_changes', ['N/A'])[0]}")
             print(f"  Estimated cost: ${budget_opt.get('optimized_cost', 0):.2f}")
             print(f"  Savings: ${budget_opt.get('savings_amount', 0):.2f}")
         
-        print(f"\n⏱️ Time Optimization:")
+        print("\n⏱️ Time Optimization:")
         if "time_optimization" in optimization["individual_optimizations"]:
             time_opt = optimization["individual_optimizations"]["time_optimization"]
             print(f"  Changes: {time_opt.get('recommended_changes', ['N/A'])}")
         
-        print(f"\n🔧 Combined Recommendation:")
+        print("\n🔧 Combined Recommendation:")
         combined = optimization["combined_recommendation"]
         print(f"  Workers: {combined['workers']}")
         print(f"  Memory per worker: {combined['memory_per_worker_mb']}MB")
         print(f"  Optimization priority: {combined['optimization_priority']}")
         
-        print(f"\n⚖️ Trade-offs:")
+        print("\n⚖️ Trade-offs:")
         for trade_off in optimization["trade_offs"]:
             print(f"  - {trade_off}")
         
@@ -233,13 +233,13 @@ def demo_real_time_dashboard():
         # Get dashboard data
         dashboard = framework.get_real_time_dashboard()
         
-        print(f"📊 Framework Status:")
+        print("📊 Framework Status:")
         status = dashboard["framework_status"]
         print(f"  Current session: {status['current_session'] or 'None'}")
         print(f"  Auto-scaling enabled: {status['auto_scaling_enabled']}")
         print(f"  Target mode: {status['framework_config']['target_mode']}")
         
-        print(f"\n💻 Resource Utilization:")
+        print("\n💻 Resource Utilization:")
         resources = dashboard["resource_utilization"]
         if resources.get("status") != "unavailable":
             print(f"  CPU usage: {resources.get('cpu_percent', 0):.1f}%")
@@ -248,7 +248,7 @@ def demo_real_time_dashboard():
         else:
             print("  Resource monitoring unavailable")
         
-        print(f"\n💰 Cost Tracking:")
+        print("\n💰 Cost Tracking:")
         cost_info = dashboard["cost_tracking"]
         print(f"  Session: {cost_info['session_id'] or 'No active session'}")
         print(f"  Estimated cost: ${cost_info['estimated_session_cost']:.2f}")
@@ -272,23 +272,23 @@ def demo_framework_summary():
     try:
         summary = framework.export_framework_summary()
         
-        print(f"🔧 Framework Information:")
+        print("🔧 Framework Information:")
         info = summary["framework_info"]
         print(f"  Version: {info['version']}")
         print(f"  Components: {len(info['components'])}")
         for component in info["components"]:
             print(f"    - {component}")
         
-        print(f"\n🚀 Capabilities:")
+        print("\n🚀 Capabilities:")
         for capability in info["capabilities"]:
             print(f"  - {capability}")
         
-        print(f"\n📁 Storage Locations:")
+        print("\n📁 Storage Locations:")
         storage = summary["storage_locations"]
         for location, path in storage.items():
             print(f"  {location}: {path}")
         
-        print(f"\n📖 Usage Examples:")
+        print("\n📖 Usage Examples:")
         examples = summary["usage_examples"]
         for method, example in examples.items():
             print(f"  {method}: {example}")
