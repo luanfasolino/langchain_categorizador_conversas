@@ -10,14 +10,17 @@ import os
 import concurrent.futures
 from tqdm import tqdm
 import hashlib
-import pickle
+try:
+    from .cache_manager import CacheManager
+except ImportError:
+    from cache_manager import CacheManager
 
 
 class BaseProcessor:
     # Padrões de sender que indicam mensagens AI/bot (em lowercase para eficiência)
     AI_SENDER_PATTERNS = [
         "ai",
-        "bot", 
+        "bot",
         "assistant",
         "ai_assistant",
         "chatbot",
@@ -33,6 +36,8 @@ class BaseProcessor:
         max_tickets_per_batch: int = 50,
         max_workers: int = None,
         use_cache: bool = True,
+        cache_size_mb: int = 1024,  # 1GB padrão
+        enable_cache_compression: bool = True,
     ):
         self.database_dir = database_dir
         self.max_tickets_per_batch = max_tickets_per_batch
@@ -43,9 +48,21 @@ class BaseProcessor:
         )  # Limita ao número de CPUs ou 4, o que for menor
         self.use_cache = use_cache
 
-        # Cria diretório de cache se não existir
+        # Inicializa o novo sistema de cache otimizado
         self.cache_dir = self.database_dir / "cache"
         self.cache_dir.mkdir(exist_ok=True)
+
+        if self.use_cache:
+            self.cache_manager = CacheManager(
+                cache_dir=self.cache_dir,
+                max_cache_size_mb=cache_size_mb,
+                max_file_size_mb=50,  # Comprime arquivos >50MB
+                use_compression=enable_cache_compression,
+                enable_statistics=True,
+                cleanup_interval_hours=24,
+            )
+        else:
+            self.cache_manager = None
 
         # Inicializa o modelo
         self.llm = ChatGoogleGenerativeAI(
@@ -418,48 +435,57 @@ class BaseProcessor:
 
         return results, batch_count, self.total_input_tokens, self.total_output_tokens
 
-    def _generate_cache_key(self, data: Any) -> str:
-        """Gera uma chave de cache baseada nos dados de entrada."""
-        # Converte os dados para string e gera um hash
-        if isinstance(data, dict):
-            # Ordena as chaves para garantir consistência
-            data_str = json.dumps(data, sort_keys=True)
-        elif isinstance(data, list):
-            # Para listas, converte cada item para string e junta
-            data_str = json.dumps([str(item) for item in data], sort_keys=True)
+    def _generate_cache_key(self, data: Any, version: str = "v2") -> str:
+        """Gera uma chave de cache usando o novo CacheManager."""
+        if self.cache_manager:
+            return self.cache_manager.generate_cache_key(data, version=version)
         else:
-            # Para outros tipos, converte diretamente para string
-            data_str = str(data)
-
-        # Gera o hash SHA-256
-        return hashlib.sha256(data_str.encode("utf-8")).hexdigest()
+            # Fallback para método antigo se cache desabilitado
+            if isinstance(data, dict):
+                data_str = json.dumps(data, sort_keys=True)
+            elif isinstance(data, list):
+                data_str = json.dumps([str(item) for item in data], sort_keys=True)
+            else:
+                data_str = str(data)
+            return hashlib.sha256(data_str.encode("utf-8")).hexdigest()
 
     def _get_from_cache(self, cache_key: str) -> Any:
-        """Recupera dados do cache se existirem."""
-        if not self.use_cache:
+        """Recupera dados do cache usando o novo CacheManager."""
+        if not self.use_cache or not self.cache_manager:
             return None
 
-        cache_file = self.cache_dir / f"{cache_key}.pkl"
-        if cache_file.exists():
-            try:
-                with open(cache_file, "rb") as f:
-                    return pickle.load(f)
-            except Exception as e:
-                print(f"Erro ao carregar cache: {str(e)}")
-                return None
-        return None
+        return self.cache_manager.get(cache_key)
 
     def _save_to_cache(self, cache_key: str, data: Any) -> None:
-        """Salva dados no cache."""
-        if not self.use_cache:
+        """Salva dados no cache usando o novo CacheManager."""
+        if not self.use_cache or not self.cache_manager:
             return
 
-        cache_file = self.cache_dir / f"{cache_key}.pkl"
-        try:
-            with open(cache_file, "wb") as f:
-                pickle.dump(data, f)
-        except Exception as e:
-            print(f"Erro ao salvar cache: {str(e)}")
+        self.cache_manager.set(cache_key, data)
+
+    def get_cache_statistics(self) -> Dict[str, Any]:
+        """Retorna estatísticas do cache."""
+        if self.cache_manager:
+            return self.cache_manager.get_statistics()
+        return {}
+
+    def clear_cache(self) -> bool:
+        """Limpa todo o cache."""
+        if self.cache_manager:
+            return self.cache_manager.clear_all()
+        return False
+
+    def optimize_cache(self) -> Dict[str, int]:
+        """Otimiza o cache (compressão, limpeza LRU, etc.)."""
+        if self.cache_manager:
+            return self.cache_manager.optimize_cache()
+        return {}
+
+    def cleanup_old_cache(self, max_age_hours: int = 72) -> int:
+        """Remove arquivos de cache antigos."""
+        if self.cache_manager:
+            return self.cache_manager.cleanup_old_files(max_age_hours)
+        return 0
 
     def prepare_data(self, input_file: Path, nrows: int = None) -> List[dict]:
         """Prepara os dados do arquivo de entrada com suporte a cache e validação aprimorada."""
@@ -627,12 +653,7 @@ class BaseProcessor:
             print(f"   '{sender}': {count:,} mensagens")
 
         # Filtra usando padrões robustos da constante da classe (já em lowercase)
-        ai_mask = (
-            df["sender"]
-            .str.lower()
-            .str.strip()
-            .isin(self.AI_SENDER_PATTERNS)
-        )
+        ai_mask = df["sender"].str.lower().str.strip().isin(self.AI_SENDER_PATTERNS)
         ai_messages_count = ai_mask.sum()
 
         df_filtered = df[~ai_mask]
