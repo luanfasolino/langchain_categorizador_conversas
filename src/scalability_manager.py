@@ -81,7 +81,7 @@ class ScalabilityManager:
             chunk_size_tokens=50000,
             chunk_overlap_tokens=5000,
             batch_size=25,
-            estimated_cost_per_ticket=0.048,
+            estimated_cost_per_ticket=0.0003,  # ~$0.0003 with Gemini 2.5 Flash
         ),
         ResourceProfile(
             dataset_size_range=(1001, 10000),
@@ -90,7 +90,7 @@ class ScalabilityManager:
             chunk_size_tokens=75000,
             chunk_overlap_tokens=7500,
             batch_size=50,
-            estimated_cost_per_ticket=0.045,
+            estimated_cost_per_ticket=0.00028,  # Slight efficiency gain
         ),
         ResourceProfile(
             dataset_size_range=(10001, 50000),
@@ -99,7 +99,7 @@ class ScalabilityManager:
             chunk_size_tokens=100000,
             chunk_overlap_tokens=10000,
             batch_size=75,
-            estimated_cost_per_ticket=0.042,
+            estimated_cost_per_ticket=0.00026,  # Better efficiency at scale
         ),
         ResourceProfile(
             dataset_size_range=(50001, 100000),
@@ -108,7 +108,7 @@ class ScalabilityManager:
             chunk_size_tokens=150000,
             chunk_overlap_tokens=15000,
             batch_size=100,
-            estimated_cost_per_ticket=0.040,
+            estimated_cost_per_ticket=0.00024,  # Economies of scale
         ),
         ResourceProfile(
             dataset_size_range=(100001, 500000),
@@ -117,7 +117,7 @@ class ScalabilityManager:
             chunk_size_tokens=200000,
             chunk_overlap_tokens=20000,
             batch_size=150,
-            estimated_cost_per_ticket=0.038,
+            estimated_cost_per_ticket=0.00023,  # Better bulk efficiency
         ),
         ResourceProfile(
             dataset_size_range=(500001, float("inf")),
@@ -126,7 +126,7 @@ class ScalabilityManager:
             chunk_size_tokens=250000,
             chunk_overlap_tokens=25000,
             batch_size=200,
-            estimated_cost_per_ticket=0.036,
+            estimated_cost_per_ticket=0.00022,  # Maximum efficiency
         ),
     ]
 

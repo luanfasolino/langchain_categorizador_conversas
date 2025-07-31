@@ -97,8 +97,8 @@ class CostCalculator:
     # Base pricing (can be configured)
     PRICING = {
         # AI API costs (per 1K tokens)
-        "gemini_input_1k_tokens": 0.075 / 1000,  # $0.075 per 1M tokens / 1000
-        "gemini_output_1k_tokens": 0.30 / 1000,  # $0.30 per 1M tokens / 1000
+        "gemini_input_1k_tokens": 0.075 / 1000,  # $0.075 per 1M tokens
+        "gemini_output_1k_tokens": 0.30 / 1000,  # $0.30 per 1M tokens
         # Infrastructure costs (per hour)
         "worker_hour_local": 0.001,  # Electricity + depreciation
         "worker_hour_cloud": 0.05,  # Cloud compute instance
@@ -190,7 +190,7 @@ class CostCalculator:
 class LinearScalingModel:
     """Model for linear cost scaling projections."""
 
-    def __init__(self, base_cost_per_ticket: float = 0.048):
+    def __init__(self, base_cost_per_ticket: float = 0.0003):  # ~$0.0003 per ticket with Gemini 2.5 Flash
         self.base_cost_per_ticket = base_cost_per_ticket
         self.cost_calculator = CostCalculator()
 

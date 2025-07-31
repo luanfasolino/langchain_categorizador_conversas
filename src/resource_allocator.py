@@ -587,7 +587,7 @@ class ResourceAllocator:
             )
 
         # Estimate cost (simplified)
-        base_cost_per_ticket = 0.048
+        base_cost_per_ticket = 0.0003  # ~$0.0003 with Gemini 2.5 Flash
         worker_efficiency = min(
             2.0, recommended_workers / 4
         )  # Efficiency bonus for more workers
