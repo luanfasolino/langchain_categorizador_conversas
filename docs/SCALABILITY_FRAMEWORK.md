@@ -68,14 +68,14 @@ dashboard = framework.get_real_time_dashboard()
 
 The framework includes predefined resource profiles optimized for different dataset sizes:
 
-| Dataset Size | Workers | Memory/Worker | Cost/Ticket | Estimated Duration |
-|--------------|---------|---------------|-------------|------------------|
-| 1-1K | 2 | 512MB | $0.048 | ~7 minutes |
-| 1K-10K | 4 | 512MB | $0.045 | ~28 minutes |
-| 10K-50K | 8 | 768MB | $0.042 | ~1.8 hours |
-| 50K-100K | 16 | 1024MB | $0.040 | ~2.4 hours |
-| 100K-500K | 32 | 1536MB | $0.038 | ~4.2 hours |
-| 500K+ | 64 | 2048MB | $0.036 | ~5.8 hours |
+| Dataset Size | Workers | Memory/Worker | Cost/Ticket | Total Cost | Estimated Duration |
+|--------------|---------|---------------|-------------|------------|------------------|
+| 1-1K | 2 | 512MB | $0.0003 | ~$0.33 | ~7 minutes |
+| 1K-10K | 4 | 512MB | $0.00028 | ~$2.43 | ~28 minutes |
+| 10K-50K | 8 | 768MB | $0.00026 | ~$11.88 | ~1.8 hours |
+| 50K-100K | 16 | 1024MB | $0.00024 | ~$24.22 | ~2.4 hours |
+| 100K-500K | 32 | 1536MB | $0.00023 | ~$120.72 | ~4.2 hours |
+| 500K+ | 64 | 2048MB | $0.00022 | ~$121+ | ~5.8 hours |
 
 ## Integration Guide
 
