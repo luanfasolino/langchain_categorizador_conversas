@@ -35,12 +35,6 @@ class TicketCategorizer(BaseProcessor):
             max_output_tokens=8192,  # Permite respostas mais completas
             top_p=0.8,  # Controla diversidade de respostas
             top_k=40,  # Limita tokens considerados
-            safety_settings={
-                "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
-                "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
-                "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
-                "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
-            },
         )
 
         # Configurações específicas para o modelo
@@ -176,10 +170,15 @@ class TicketCategorizer(BaseProcessor):
             )
 
         print(f"⚡ Total estimado de tokens: {total_tokens:,}")
-        print(f"📈 Média de tokens por chunk: {total_tokens // len(docs):,}")
-        print(
-            f"🎯 Start index tracking: {'Ativo' if docs[0].metadata.get('start_index') is not None else 'Inativo'}"
-        )
+        if len(docs) > 0:
+            print(f"📈 Média de tokens por chunk: {total_tokens // len(docs):,}")
+            print(
+                f"🎯 Start index tracking: {'Ativo' if docs[0].metadata.get('start_index') is not None else 'Inativo'}"
+            )
+        else:
+            print(
+                "⚠️  Nenhum chunk foi criado - verifique se há dados válidos para processar"
+            )
 
         return docs
 
@@ -452,7 +451,17 @@ class TicketCategorizer(BaseProcessor):
             f"   • Monitoramento de budget: {'Ativo' if tracking_config['budget_monitoring'] else 'Inativo'}"
         )
 
-        return tracking_config
+    def _format_cost_friendly(self, cost_usd: float) -> str:
+        """
+        Formata custos de forma amigável ao usuário.
+        Para valores < $0.10, mostra em centavos.
+        """
+        if cost_usd < 0.001:
+            return f"{cost_usd * 1000:.2f}m¢"  # milicents para valores muito pequenos
+        elif cost_usd < 0.10:
+            return f"{cost_usd * 100:.1f}¢"  # centavos
+        else:
+            return f"${cost_usd:.3f}"  # dólares
 
     def track_token_usage(
         self,
@@ -469,8 +478,8 @@ class TicketCategorizer(BaseProcessor):
             self.setup_token_tracking_system()
 
         # Calcula custos baseado em pricing Gemini 2.5 Flash
-        input_cost = (input_tokens / 1000) * 0.125
-        output_cost = (output_tokens / 1000) * 0.375
+        input_cost = (input_tokens / 1000000) * 0.075
+        output_cost = (output_tokens / 1000000) * 0.30
         total_cost = input_cost + output_cost
 
         # Atualiza tracking global
@@ -815,18 +824,24 @@ class TicketCategorizer(BaseProcessor):
                             else ""
                         )
                         tracking_info = result.get("tracking_result", {})
-                        cost_info = (
-                            f" | Cost: ${tracking_info.get('total_cost', 0):.4f}"
-                            if tracking_info
-                            else ""
-                        )
+                        cost_info = ""
+                        if tracking_info:
+                            cost_value = tracking_info.get("total_cost", 0)
+                            cost_formatted = self._format_cost_friendly(cost_value)
+                            cost_info = f" | Cost: {cost_formatted}"
 
-                        print(
-                            f"✅ Chunk {chunk_index}/{len(docs)} | "
-                            f"In: {result['input_tokens']:,} | "
-                            f"Out: {result['output_tokens']:,} | "
-                            f"Time: {result.get('processing_time', 0):.2f}s{cost_info}{retry_info}"
-                        )
+                        # Log detalhado apenas a cada 10 chunks ou no último para reduzir verbosidade
+                        if (
+                            chunk_index % 10 == 0
+                            or chunk_index == len(docs)
+                            or result.get("retry_attempts", 1) > 1
+                        ):
+                            print(
+                                f"✅ Chunk {chunk_index}/{len(docs)} | "
+                                f"In: {result['input_tokens']:,} | "
+                                f"Out: {result['output_tokens']:,} | "
+                                f"Time: {result.get('processing_time', 0):.2f}s{cost_info}{retry_info}"
+                            )
                     else:
                         print(
                             f"❌ Falha no chunk {chunk_index}: {result.get('error', 'Erro desconhecido')}"
@@ -850,7 +865,8 @@ class TicketCategorizer(BaseProcessor):
             print(
                 f"   • Tokens MAP - Input: {map_phase_data['input']:,} | Output: {map_phase_data['output']:,}"
             )
-            print(f"   • Custo da fase MAP: ${map_phase_data['cost']:.4f}")
+            map_cost_formatted = self._format_cost_friendly(map_phase_data["cost"])
+            print(f"   • Custo da fase MAP: {map_cost_formatted}")
 
         # 2. Reduce: Combina as análises parciais
         print("\n🔄 Fase COMBINE: Combinando análises parciais...")
@@ -867,8 +883,11 @@ class TicketCategorizer(BaseProcessor):
                 "combine", combine_tokens_in, combine_tokens_out
             )
 
+            combine_cost_formatted = self._format_cost_friendly(
+                combine_tracking["total_cost"]
+            )
             print(
-                f"💰 Fase COMBINE - Tokens: {combine_tokens_in:,} → {combine_tokens_out:,} | Custo: ${combine_tracking['total_cost']:.4f}"
+                f"💰 Fase COMBINE - Tokens: {combine_tokens_in:,} → {combine_tokens_out:,} | Custo: {combine_cost_formatted}"
             )
 
         except Exception as e:
@@ -1055,19 +1074,25 @@ class TicketCategorizer(BaseProcessor):
                                 else ""
                             )
                             tracking_info = result.get("tracking_result", {})
-                            cost_info = (
-                                f" | Cost: ${tracking_info.get('total_cost', 0):.4f}"
-                                if tracking_info
-                                else ""
-                            )
+                            cost_info = ""
+                            if tracking_info:
+                                cost_value = tracking_info.get("total_cost", 0)
+                                cost_formatted = self._format_cost_friendly(cost_value)
+                                cost_info = f" | Cost: {cost_formatted}"
 
-                            print(
-                                f"✅ Batch {batch_index}/{len(ticket_batches)} | "
-                                f"Tickets: {len(result['results'])} | "
-                                f"In: {result['input_tokens']:,} | "
-                                f"Out: {result['output_tokens']:,} | "
-                                f"Time: {result.get('processing_time', 0):.2f}s{cost_info}{retry_info}"
-                            )
+                            # Log detalhado apenas a cada 10 batches ou no último para reduzir verbosidade
+                            if (
+                                batch_index % 10 == 0
+                                or batch_index == len(ticket_batches)
+                                or result.get("retry_attempts", 1) > 1
+                            ):
+                                print(
+                                    f"✅ Batch {batch_index}/{len(ticket_batches)} | "
+                                    f"Tickets: {len(result['results'])} | "
+                                    f"In: {result['input_tokens']:,} | "
+                                    f"Out: {result['output_tokens']:,} | "
+                                    f"Time: {result.get('processing_time', 0):.2f}s{cost_info}{retry_info}"
+                                )
                         else:
                             print(
                                 f"❌ Falha no batch {batch_index}: {result.get('error', 'Erro desconhecido')}"
@@ -1094,9 +1119,10 @@ class TicketCategorizer(BaseProcessor):
             print(
                 f"   • Tokens CATEGORIZE - Input: {categorize_phase_data['input']:,} | Output: {categorize_phase_data['output']:,}"
             )
-            print(
-                f"   • Custo da fase CATEGORIZE: ${categorize_phase_data['cost']:.4f}"
+            categorize_cost_formatted = self._format_cost_friendly(
+                categorize_phase_data["cost"]
             )
+            print(f"   • Custo da fase CATEGORIZE: {categorize_cost_formatted}")
 
             if not all_categorization_results:
                 print("\nAviso: Nenhuma categorização válida foi gerada!")
@@ -1143,7 +1169,10 @@ class TicketCategorizer(BaseProcessor):
                 f"   • Total Output Tokens: {session_summary['total_output_tokens']:,}"
             )
             print(f"   • Total Geral: {session_summary['total_tokens']:,}")
-            print(f"   • Custo Total: ${session_summary['total_cost_usd']}")
+            total_cost_formatted = self._format_cost_friendly(
+                session_summary["total_cost_usd"]
+            )
+            print(f"   • Custo Total: {total_cost_formatted}")
             print(f"   • Duração: {session_summary['session_duration_seconds']:.1f}s")
 
             # Breakdown por fase
