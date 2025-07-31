@@ -732,134 +732,54 @@ class TicketCategorizer(BaseProcessor):
         # Configura executor paralelo Task 1.2
         self.setup_parallel_executor()
 
-        # 1. Map: Analisa cada chunk (processamento paralelo otimizado)
-        print("\n🔄 Fase MAP: Realizando análise dos chunks em paralelo...")
-        partial_analyses = []
-
-        # Função otimizada para processar um chunk com retry logic Task 1.4
-        def process_chunk(doc_index, doc):
-            def _process_chunk_internal():
-                # Extrai metadados do chunk
-                chunk_metadata = doc.metadata
-                input_text = doc.page_content
-                input_tokens = chunk_metadata.get(
-                    "estimated_tokens", self.estimate_tokens(input_text)
-                )
-
-                analysis = map_chain.invoke({"text": input_text})
-
-                # Conta tokens de saída
-                output_tokens = self.estimate_tokens(analysis)
-
-                # Registra no sistema de tracking - Task 1.5
-                tracking_result = self.track_token_usage(
-                    "map", input_tokens, output_tokens, {"chunk_processed": True}
-                )
-
-                return {
-                    "analysis": analysis,
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "chunk_metadata": chunk_metadata,
-                    "tracking_result": tracking_result,
-                }
-
-            # Executa com retry automático
-            result = self.execute_with_retry(
-                _process_chunk_internal, f"process_chunk_{doc_index}", max_retries=3
+        # 1. Map: Analisa cada chunk usando cache inteligente (processamento paralelo otimizado)
+        print("\n🔄 Fase MAP: Realizando análise dos chunks em paralelo com cache inteligente...")
+        
+        # Função wrapper para preservar tracking e retry logic
+        def map_processor_with_tracking(text: str) -> str:
+            """
+            Função wrapper que processa um chunk com tracking de tokens.
+            Compatível com o sistema de cache do BaseProcessor.
+            """
+            # Estimativa de tokens de entrada
+            input_tokens = self.estimate_tokens(text)
+            
+            # Processa com LLM
+            analysis = map_chain.invoke({"text": text})
+            
+            # Estimativa de tokens de saída
+            output_tokens = self.estimate_tokens(analysis)
+            
+            # Registra no sistema de tracking - Task 1.5
+            tracking_result = self.track_token_usage(
+                "map", input_tokens, output_tokens, {"chunk_processed": True}
+            )
+            
+            return analysis
+        
+        # Usa sistema de cache inteligente do BaseProcessor
+        try:
+            partial_analyses, total_input_tokens, total_output_tokens = self.process_chunks_with_cache(
+                docs, map_processor_with_tracking, "map"
             )
 
-            if result["success"]:
-                return {
-                    **result["result"],
-                    "processing_time": result["execution_time"],
-                    "retry_attempts": result["attempt"],
-                    "success": True,
-                }
-            else:
-                print(
-                    f"❌ Chunk {doc_index} falhou após {result['attempts']} tentativas: {result['error']}"
-                )
-                return {
-                    "analysis": None,
-                    "input_tokens": 0,
-                    "output_tokens": 0,
-                    "processing_time": 0,
-                    "retry_attempts": result["attempts"],
-                    "success": False,
-                    "error": result["error"],
-                    "error_type": result.get("error_type", "UNKNOWN"),
-                }
-
-        # Processa os chunks em paralelo
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers
-        ) as executor:
-            # Submete todos os chunks para processamento
-            future_to_chunk = {
-                executor.submit(process_chunk, i, doc): (i, doc)
-                for i, doc in enumerate(docs, 1)
-            }
-
-            # Coleta os resultados com monitoramento de performance Task 1.2
-            total_processing_time = 0
-            successful_chunks = 0
-
-            for future in tqdm(
-                concurrent.futures.as_completed(future_to_chunk),
-                total=len(docs),
-                desc="🔄 Processando chunks MAP",
-            ):
-                chunk_index, _ = future_to_chunk[future]
-                try:
-                    result = future.result()
-                    if result["success"]:
-                        partial_analyses.append(result["analysis"])
-                        total_processing_time += result.get("processing_time", 0)
-                        successful_chunks += 1
-
-                        retry_info = (
-                            f" (retry: {result.get('retry_attempts', 1)})"
-                            if result.get("retry_attempts", 1) > 1
-                            else ""
-                        )
-                        tracking_info = result.get("tracking_result", {})
-                        cost_info = ""
-                        if tracking_info:
-                            cost_value = tracking_info.get("total_cost", 0)
-                            cost_formatted = self._format_cost_friendly(cost_value)
-                            cost_info = f" | Cost: {cost_formatted}"
-
-                        # Log detalhado apenas a cada 10 chunks ou no último para reduzir verbosidade
-                        if (
-                            chunk_index % 10 == 0
-                            or chunk_index == len(docs)
-                            or result.get("retry_attempts", 1) > 1
-                        ):
-                            print(
-                                f"✅ Chunk {chunk_index}/{len(docs)} | "
-                                f"In: {result['input_tokens']:,} | "
-                                f"Out: {result['output_tokens']:,} | "
-                                f"Time: {result.get('processing_time', 0):.2f}s{cost_info}{retry_info}"
-                            )
-                    else:
-                        print(
-                            f"❌ Falha no chunk {chunk_index}: {result.get('error', 'Erro desconhecido')}"
-                        )
-                except Exception as e:
-                    print(f"⚠️  Exceção ao processar chunk {chunk_index}: {str(e)}")
-
-            # Estatísticas de performance
-            avg_processing_time = (
-                total_processing_time / successful_chunks
-                if successful_chunks > 0
-                else 0
-            )
+            # Estatísticas de performance com cache inteligente
+            successful_chunks = len(partial_analyses)
+            print(f"✅ Fase MAP concluída: {successful_chunks}/{len(docs)} chunks processados")
+            
+            # Exibe estatísticas de cache se disponível
+            if self.cache_manager:
+                cache_stats = self.cache_manager.get_statistics()
+                hit_rate = cache_stats.get('hit_rate', 0) * 100
+                print(f"📊 Cache performance: {hit_rate:.1f}% hit rate")
+                if hit_rate > 0:
+                    print(f"⚡ Cache economizou {cache_stats.get('hits', 0)} processamentos de LLM!")
+            
             print("\n📊 Estatísticas de Performance MAP:")
             print(f"   • Chunks processados: {successful_chunks}/{len(docs)}")
-            print(f"   • Tempo médio por chunk: {avg_processing_time:.2f}s")
-            print(f"   • Tempo total de processamento: {total_processing_time:.2f}s")
-
+            print(f"   • Total Input Tokens: {total_input_tokens:,}")
+            print(f"   • Total Output Tokens: {total_output_tokens:,}")
+            
             # Mostra estatísticas de tokens da fase MAP
             map_phase_data = self.token_tracker["phase_breakdown"]["map"]
             print(
@@ -867,6 +787,10 @@ class TicketCategorizer(BaseProcessor):
             )
             map_cost_formatted = self._format_cost_friendly(map_phase_data["cost"])
             print(f"   • Custo da fase MAP: {map_cost_formatted}")
+            
+        except Exception as e:
+            print(f"❌ Erro na fase MAP: {str(e)}")
+            return None
 
         # 2. Reduce: Combina as análises parciais
         print("\n🔄 Fase COMBINE: Combinando análises parciais...")
