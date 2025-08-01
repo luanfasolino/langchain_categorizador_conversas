@@ -292,9 +292,13 @@ class TicketSummarizer(BaseProcessor):
 
             # Salva resultados
 
+            # Cria diretório de análises se não existir
+            analysis_dir = self.database_dir / "analysis_reports"
+            analysis_dir.mkdir(exist_ok=True)
+
             # Salva em dois formatos: CSV para bullets e TXT para o resumo
-            output_file_csv = self.database_dir / "summarized_tickets.csv"
-            output_file_txt = self.database_dir / "summarized_tickets_resumo.txt"
+            output_file_csv = analysis_dir / "summarized_tickets.csv"
+            output_file_txt = analysis_dir / "summarized_tickets_resumo.txt"
 
             # Salva bullets em CSV
             bullets_df = pd.DataFrame(valid_bullets)

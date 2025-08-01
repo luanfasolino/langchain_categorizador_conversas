@@ -1178,7 +1178,7 @@ class BaseProcessor:
             # Tenta recuperar do cache
             cached_result = self._get_from_cache(cache_key)
             if cached_result is not None:
-                print(f"Usando resultado em cache para chunk {doc_index}")
+                print(f"🎯 Cache HIT para chunk {doc_index}")
                 return cached_result
 
             try:
@@ -1188,6 +1188,12 @@ class BaseProcessor:
                 result = map_chain.invoke({"text": chunk_text})
 
                 output_tokens = self.estimate_tokens(result)
+
+                # Registra no sistema de tracking de tokens (se disponível)
+                if hasattr(self, 'track_token_usage'):
+                    self.track_token_usage(
+                        processor_name, input_tokens, output_tokens, {"chunk_processed": True}
+                    )
 
                 # Prepara o resultado
                 processed_result = {
