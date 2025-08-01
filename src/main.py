@@ -193,10 +193,10 @@ def interactive_cache_control(cache_dir, cache_control_arg=None):
     """
     cache_stats = get_cache_statistics(cache_dir)
     
-    # Se não há cache, sempre processa fresh
+    # Se não há cache, processa fresh e permite gerar novo cache
     if not cache_stats:
         print("📦 Nenhum cache encontrado. Processamento fresh será executado.")
-        return False
+        return True  # CORREÇÃO: Permite gerar novo cache quando não há cache existente
     
     # Se foi especificado via argumento
     if cache_control_arg:
@@ -207,7 +207,7 @@ def interactive_cache_control(cache_dir, cache_control_arg=None):
             print("🔄 Iniciando fresh start (especificado via CLI)")
             if clear_all_cache(cache_dir):
                 print("✅ Cache limpo com sucesso")
-                return False
+                return True  # CORREÇÃO: Permite gerar novo cache após limpeza
             else:
                 print("❌ Erro ao limpar cache, continuando com cache existente")
                 return True
@@ -254,7 +254,7 @@ def interactive_cache_control(cache_dir, cache_control_arg=None):
                 print("⚠️  Deletando cache existente...")
                 if clear_all_cache(cache_dir):
                     print("✅ Cache limpo com sucesso")
-                    return False
+                    return True  # CORREÇÃO: Permite gerar novo cache após limpeza
                 else:
                     print("❌ Erro ao limpar cache, continuando com cache existente")
                     return True
@@ -333,9 +333,9 @@ def main():
     DATABASE_DIR = Path(__file__).parent.parent / "database"
     DATABASE_DIR.mkdir(exist_ok=True)
 
-    # Para o modo analyze, o input file é opcional (usa arquivos do pipeline)
-    if args.mode == "analyze":
-        input_file = None  # Será detectado automaticamente pelo TicketReportGenerator
+    # Para os modos analyze e merge, o input file é opcional (usa arquivos do pipeline)
+    if args.mode in ["analyze", "merge"]:
+        input_file = None  # Será detectado automaticamente
     else:
         # Seleciona o arquivo de entrada para outros modos
         input_file = select_input_file(DATABASE_DIR, args.input_file)
@@ -365,7 +365,7 @@ def main():
                 use_cache=use_cache,
             )
             categories_file = categorizer.process_tickets(input_file, nrows=args.nrows)
-            print(f"Categorização concluída: {categories_file}")
+            print(f"Classificação concluída (Map→Reduce→Classify): {categories_file}")
             
             # Log de uso de cache
             if use_cache:
@@ -390,11 +390,15 @@ def main():
                 print("🔄 Processamento fresh executado (sem cache)")
 
         if args.mode in ["merge", "all"]:
-            categories_file = DATABASE_DIR / "categorized_tickets.csv"
-            summaries_file = DATABASE_DIR / "summarized_tickets.csv"
+            analysis_dir = DATABASE_DIR / "analysis_reports"
+            categories_file = analysis_dir / "categorized_tickets.csv"
+            summaries_file = analysis_dir / "summarized_tickets.csv"
 
             if not categories_file.exists() or not summaries_file.exists():
-                print("Arquivos necessários para merge não encontrados")
+                print("⚠️  Arquivos necessários para merge não encontrados em:")
+                print(f"   • Categorias: {categories_file}")
+                print(f"   • Resumos: {summaries_file}")
+                print("💡 Execute primeiro: python main.py --mode categorize e --mode summarize")
                 return
 
             merger = TicketDataMerger(DATABASE_DIR)

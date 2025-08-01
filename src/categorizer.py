@@ -52,60 +52,61 @@ class TicketCategorizer(BaseProcessor):
         print(f"   • Max tokens output: {self.model_config['max_tokens_output']:,}")
         print(f"   • Otimizado para: {self.model_config['optimized_for']}")
 
-        # Template otimizado para análise inicial dos chunks (MAP phase)
+        # Template para resumo inicial dos chunks (MAP phase) - Conforme PRD Original
         self.map_template = ChatPromptTemplate.from_template(
             """
-            Você é um especialista em análise de conversas de suporte ao cliente. Sua tarefa é identificar padrões e categorizar motivos de contato.
+            Você é um especialista em análise de conversas de suporte ao cliente. Sua tarefa é resumir os problemas principais relatados.
 
             INSTRUÇÕES:
             1. Analise cuidadosamente as conversas fornecidas
-            2. Identifique os principais padrões e motivos subjacentes dos contatos
-            3. Foque nas causas raiz dos problemas, não apenas nos sintomas
-            4. Considere contextos específicos como: pagamentos, sistema, reservas, antifraude, etc.
-            5. Mantenha consistência terminológica
+            2. Resuma em UMA frase (máximo 40 palavras) o problema principal de cada trecho
+            3. Seja específico sobre o tipo de problema relatado
+            4. Foque no problema central, não em detalhes secundários
+            5. Use linguagem clara e objetiva
 
             CONVERSAS PARA ANÁLISE:
             {text}
 
             FORMATO DE RESPOSTA:
-            Forneça uma análise concisa em um parágrafo único, destacando as principais categorias identificadas e seus padrões recorrentes.
+            Forneça um resumo conciso em uma única frase descrevendo o problema principal identificado no trecho.
         """
         )
 
-        # Template otimizado para combinar análises parciais (COMBINE phase)
+        # Template para consolidação de resumos (REDUCE phase) - Conforme PRD Original
         self.combine_template = ChatPromptTemplate.from_template(
             """
-            Você é um especialista em consolidação de análises de suporte ao cliente. Sua tarefa é sintetizar múltiplas análises parciais em uma visão unificada.
+            Você é um especialista em consolidação de resumos de suporte ao cliente. Sua tarefa é sintetizar múltiplos resumos em uma visão unificada.
 
             INSTRUÇÕES:
-            1. Combine as análises parciais fornecidas em uma visão consolidada
-            2. Identifique padrões mais frequentes e motivos subjacentes recorrentes
-            3. Estabeleça um vocabulário consistente para as categorias
-            4. Priorize categorias específicas sobre genéricas
-            5. Mantenha foco nas causas raiz dos contatos
+            1. Analise todos os resumos parciais fornecidos
+            2. Identifique os tipos de problemas mais frequentes
+            3. Crie uma visão consolidada dos principais padrões de problemas
+            4. Agrupe problemas similares
+            5. Mantenha foco nos problemas centrais identificados
 
-            ANÁLISES PARCIAIS PARA CONSOLIDAÇÃO:
+            RESUMOS PARCIAIS PARA CONSOLIDAÇÃO:
             {text}
 
             FORMATO DE RESPOSTA:
-            Forneça uma análise consolidada em um parágrafo único, destacando as principais categorias padronizadas e seus motivos subjacentes.
-            Exemplo de categorias esperadas: "Problema com Pagamento", "Erro no Sistema", "Dúvida de Reserva", "Questão Antifraude", etc.
+            Forneça uma análise consolidada em um parágrafo único, destacando os principais tipos de problemas identificados e seus padrões de frequência.
+            Use linguagem clara e foque nos problemas centrais relatados pelos clientes.
         """
         )
 
-        # Template otimizado para categorização final (REDUCE phase)
+        # Template otimizado para classificação final (CLASSIFY phase) - Conforme PRD Original
         self.categorize_template = ChatPromptTemplate.from_template(
             """
-            Você é um especialista em categorização de tickets de suporte ao cliente. Use a análise consolidada para categorizar cada ticket de forma precisa e consistente.
+            Você é um especialista em classificação de tickets de suporte ao cliente. Use a análise consolidada dos problemas identificados para classificar cada ticket de forma precisa e consistente.
 
-            REGRAS DE CATEGORIZAÇÃO:
+            INSTRUÇÕES PARA CLASSIFICAÇÃO:
             1. Use EXATAMENTE o ticket_id que aparece após "Ticket"
-            2. Atribua 1-3 categorias por ticket, em ordem de relevância
-            3. Priorize categorias específicas sobre genéricas
-            4. Mantenha consistência com o vocabulário da análise consolidada
-            5. Evite termos genéricos: "Problemas Gerais", "Outros", "Diversos"
-            6. Cada categoria: máximo 50 caracteres, clara e específica
-            7. Para contextos específicos (antifraude, pagamento, sistema), use a categoria mais específica
+            2. Baseie-se nos tipos de problemas identificados na análise consolidada
+            3. Atribua 1-3 categorias por ticket, em ordem de relevância
+            4. Priorize categorias específicas sobre genéricas
+            5. Mantenha consistência com os padrões identificados na análise
+            6. Evite termos genéricos: "Problemas Gerais", "Outros", "Diversos"
+            7. Cada categoria: máximo 50 caracteres, clara e específica
+            8. Use os tipos de problemas da análise como base para as categorias
 
             FORMATO JSON OBRIGATÓRIO (RESPONDA APENAS COM O JSON):
             {{
@@ -115,10 +116,10 @@ class TicketCategorizer(BaseProcessor):
               ]
             }}
 
-            ANÁLISE CONSOLIDADA:
+            ANÁLISE CONSOLIDADA DOS PROBLEMAS:
             {analysis}
 
-            TICKETS PARA CATEGORIZAÇÃO:
+            TICKETS PARA CLASSIFICAÇÃO:
             {tickets}
         """
         )
@@ -132,8 +133,8 @@ class TicketCategorizer(BaseProcessor):
             add_start_index=True,  # Rastreamento de posição conforme best practices
         )
 
-        # Configurações de batching para otimização
-        self.optimal_batch_size = 220  # Tamanho otimizado baseado em testes
+        # Configurações de batching para otimização  
+        self.optimal_batch_size = 5   # Muito conservador para evitar overflow de contexto
         self.token_buffer_size = 50000  # Buffer para evitar overflow de tokens
 
     def create_optimized_chunks(self, full_text: str) -> List[Document]:
@@ -414,7 +415,7 @@ class TicketCategorizer(BaseProcessor):
             "cost_per_1k_output_tokens": 0.00060,  # Gemini 2.5 Flash (non-thinking mode) as of Jul 2025 (USD)
             # "cost_per_1k_output_tokens_thinking": 0.00350 # Add if using thinking-mode pricing
             "currency": "USD",
-            "tracking_phases": ["map", "combine", "categorize"],
+            "tracking_phases": ["map", "combine", "classify"],
             "budget_monitoring": True,
             "cost_projections": True,
             "detailed_breakdown": True,
@@ -427,6 +428,12 @@ class TicketCategorizer(BaseProcessor):
             "phase_breakdown": {
                 "map": {"input": 0, "output": 0, "cost": 0.0, "chunks_processed": 0},
                 "combine": {"input": 0, "output": 0, "cost": 0.0},
+                "classify": {
+                    "input": 0,
+                    "output": 0,
+                    "cost": 0.0,
+                    "batches_processed": 0,
+                },
                 "categorize": {
                     "input": 0,
                     "output": 0,
@@ -498,7 +505,7 @@ class TicketCategorizer(BaseProcessor):
             if additional_context:
                 if phase == "map" and "chunk_processed" in additional_context:
                     phase_data["chunks_processed"] += 1
-                elif phase == "categorize" and "batch_processed" in additional_context:
+                elif phase in ["classify", "categorize"] and "batch_processed" in additional_context:
                     phase_data["batches_processed"] += 1
 
         # Calcula métricas de performance em tempo real
@@ -639,8 +646,9 @@ class TicketCategorizer(BaseProcessor):
                     "combine_phase": round(
                         self.token_tracker["phase_breakdown"]["combine"]["cost"], 4
                     ),
-                    "categorize_phase": round(
-                        self.token_tracker["phase_breakdown"]["categorize"]["cost"], 4
+                    "classify_phase": round(
+                        self.token_tracker["phase_breakdown"].get("classify", 
+                                                                    self.token_tracker["phase_breakdown"]["categorize"])["cost"], 4
                     ),
                 },
             },
@@ -678,16 +686,16 @@ class TicketCategorizer(BaseProcessor):
         phases = self.token_tracker["phase_breakdown"]
         map_cost = phases["map"]["cost"]
         combine_cost = phases["combine"]["cost"]
-        categorize_cost = phases["categorize"]["cost"]
+        classify_cost = phases.get("classify", phases["categorize"])["cost"]
 
-        if map_cost > combine_cost + categorize_cost:
+        if map_cost > combine_cost + classify_cost:
             recommendations.append(
                 "🔄 Fase MAP dominando custos - otimize tamanho de chunks"
             )
 
-        if categorize_cost > map_cost + combine_cost:
+        if classify_cost > map_cost + combine_cost:
             recommendations.append(
-                "🎯 Fase CATEGORIZE dominando custos - otimize tamanho de batches"
+                "🎯 Fase CLASSIFY dominando custos - otimize tamanho de batches"
             )
 
         if not recommendations:
@@ -698,7 +706,7 @@ class TicketCategorizer(BaseProcessor):
         return recommendations
 
     def process_tickets(self, input_file: Path, nrows: int = None) -> Path:
-        """Processa os tickets usando uma abordagem map-reduce para categorização"""
+        """Processa os tickets usando abordagem Map-Reduce-Classify conforme PRD original: summarize → consolidate → categorize"""
         tickets = self.prepare_data(input_file, nrows=nrows)
         print(f"\nProcessando arquivo: {input_file}")
         print(f"Total de tickets para processar: {len(tickets)}")
@@ -722,18 +730,18 @@ class TicketCategorizer(BaseProcessor):
             f"Ticket {ticket['ticket_id']}:\n{ticket['text']}" for ticket in tickets
         )
 
-        # Cria chunks otimizados usando estratégia Map-Reduce Task 1.1
+        # Cria chunks otimizados usando estratégia Map-Reduce-Classify (PRD Original)
         docs = self.create_optimized_chunks(full_text)
 
-        # Configura chains LCEL otimizadas conforme Context7 best practices
-        map_chain = self.map_template | self.llm | StrOutputParser()
-        combine_chain = self.combine_template | self.llm | StrOutputParser()
+        # Configura chains LCEL para o pipeline Map→Reduce→Classify
+        map_chain = self.map_template | self.llm | StrOutputParser()       # MAP: Resumo dos chunks
+        combine_chain = self.combine_template | self.llm | StrOutputParser() # REDUCE: Consolida resumos
 
         # Configura executor paralelo Task 1.2
         self.setup_parallel_executor()
 
-        # 1. Map: Analisa cada chunk usando cache inteligente (processamento paralelo otimizado)
-        print("\n🔄 Fase MAP: Realizando análise dos chunks em paralelo com cache inteligente...")
+        # 1. MAP: Gera resumos dos chunks - Conforme PRD Original Map→Reduce→Classify
+        print("\n🔄 Fase MAP: Resumindo problemas dos chunks em paralelo com cache inteligente...")
         
         # Usa sistema de cache inteligente do BaseProcessor passando a chain diretamente
         try:
@@ -751,10 +759,10 @@ class TicketCategorizer(BaseProcessor):
                 hit_rate = cache_stats.get('hit_rate', 0) * 100
                 print(f"📊 Cache performance: {hit_rate:.1f}% hit rate")
                 if hit_rate > 0:
-                    print(f"⚡ Cache economizou {cache_stats.get('hits', 0)} processamentos de LLM!")
+                    print(f"⚡ Cache economizou {cache_stats.get('hits', 0)} processamentos de resumo!")
             
-            print("\n📊 Estatísticas de Performance MAP:")
-            print(f"   • Chunks processados: {successful_chunks}/{len(docs)}")
+            print("\n📊 Estatísticas de Performance MAP (Resumos):")
+            print(f"   • Chunks resumidos: {successful_chunks}/{len(docs)}")
             print(f"   • Total Input Tokens: {total_input_tokens:,}")
             print(f"   • Total Output Tokens: {total_output_tokens:,}")
             
@@ -770,8 +778,8 @@ class TicketCategorizer(BaseProcessor):
             print(f"❌ Erro na fase MAP: {str(e)}")
             return None
 
-        # 2. Reduce: Combina as análises parciais
-        print("\n🔄 Fase COMBINE: Combinando análises parciais...")
+        # 2. REDUCE: Consolida os resumos parciais - Conforme PRD Original Map→Reduce→Classify
+        print("\n🔄 Fase REDUCE: Consolidando resumos parciais em visão unificada...")
         try:
             combine_input = "\n\n".join(partial_analyses)
             combine_tokens_in = self.estimate_tokens(combine_input)
@@ -789,35 +797,35 @@ class TicketCategorizer(BaseProcessor):
                 combine_tracking["total_cost"]
             )
             print(
-                f"💰 Fase COMBINE - Tokens: {combine_tokens_in:,} → {combine_tokens_out:,} | Custo: {combine_cost_formatted}"
+                f"💰 Fase REDUCE - Tokens: {combine_tokens_in:,} → {combine_tokens_out:,} | Custo: {combine_cost_formatted}"
             )
 
         except Exception as e:
-            print(f"Erro ao combinar análises: {str(e)}")
+            print(f"Erro ao consolidar resumos: {str(e)}")
             return None
 
-        # 3. Categoriza os tickets usando a análise consolidada, processamento paralelo otimizado
-        print("\n🔄 Fase CATEGORIZE: Categorizando tickets em paralelo...")
+        # 3. CLASSIFY: Categoriza os tickets usando análise consolidada - Conforme PRD Original
+        print("\n🔄 Fase CLASSIFY: Categorizando tickets baseado em análise consolidada...")
         try:
-            # Chain de summary otimizada com LCEL Context7 best practices
-            print("\nResumindo análise consolidada com LCEL otimizado...")
+            # Configura a chain de classificação final
+            classify_chain = self.categorize_template | self.llm | StrOutputParser()
+            
+            # Resumo da análise consolidada para economizar tokens
+            print("\nPreparando análise consolidada para classificação...")
             summary_template = ChatPromptTemplate.from_template(
                 """
-                Você é um especialista em síntese de análises de suporte. Resuma de forma concisa mantendo apenas informações essenciais sobre categorias e padrões.
+                Você é um especialista em síntese de análises de suporte. Resuma de forma concisa mantendo apenas informações essenciais sobre tipos de problemas e padrões identificados.
 
                 ANÁLISE CONSOLIDADA:
                 {text}
 
-                RESUMO CONCISO (mantenha categorias específicas e padrões principais):
+                RESUMO PARA CLASSIFICAÇÃO (mantenha tipos de problemas específicos e padrões principais):
                 """
             )
             summary_chain = summary_template | self.llm | StrOutputParser()
 
             analysis_summary = summary_chain.invoke({"text": consolidated_analysis})
-            print("Análise resumida com sucesso.")
-
-            # Configure o categorize_chain
-            categorize_chain = self.categorize_template | self.llm | StrOutputParser()
+            print("Análise consolidada preparada para classificação.")
 
             # Usa tamanho de batch otimizado da configuração
             batch_size = self.optimal_batch_size
@@ -826,7 +834,7 @@ class TicketCategorizer(BaseProcessor):
             ticket_batches = [
                 tickets[i : i + batch_size] for i in range(0, len(tickets), batch_size)
             ]
-            print(f"Dividindo os tickets em {len(ticket_batches)} batches.")
+            print(f"Dividindo os tickets em {len(ticket_batches)} batches para classificação.")
 
             # Função otimizada para processar batch com retry logic Task 1.4
             def process_batch(batch_index, batch):
@@ -837,22 +845,32 @@ class TicketCategorizer(BaseProcessor):
                         for ticket in batch
                     )
 
-                    categorize_input = {
+                    classify_input = {
                         "analysis": analysis_summary,
                         "tickets": batch_text,
                     }
 
                     # Monitora tokens para este batch
                     batch_input_tokens = sum(
-                        self.estimate_tokens(str(v)) for v in categorize_input.values()
+                        self.estimate_tokens(str(v)) for v in classify_input.values()
                     )
 
-                    response = categorize_chain.invoke(categorize_input)
+                    response = classify_chain.invoke(classify_input)
                     batch_output_tokens = self.estimate_tokens(response)
+                    
+                    # Verifica se resposta está vazia
+                    if not response or len(response.strip()) == 0:
+                        return {
+                            "results": [],
+                            "input_tokens": batch_input_tokens,
+                            "output_tokens": 0,
+                            "success": False,
+                            "error": "Resposta vazia do modelo",
+                        }
 
                     # Registra no sistema de tracking - Task 1.5
                     batch_tracking = self.track_token_usage(
-                        "categorize",
+                        "classify",
                         batch_input_tokens,
                         batch_output_tokens,
                         {"batch_processed": True},
@@ -914,7 +932,7 @@ class TicketCategorizer(BaseProcessor):
                 # Executa com retry automático
                 result = self.execute_with_retry(
                     _process_batch_internal,
-                    f"process_batch_{batch_index}",
+                    f"classify_batch_{batch_index}",
                     max_retries=3,
                 )
 
@@ -958,7 +976,7 @@ class TicketCategorizer(BaseProcessor):
                 for future in tqdm(
                     concurrent.futures.as_completed(future_to_batch),
                     total=len(ticket_batches),
-                    desc="🔄 Processando batches CATEGORIZE",
+                    desc="🔄 Processando batches CLASSIFY",
                 ):
                     batch_index, _ = future_to_batch[future]
                     try:
@@ -1008,9 +1026,10 @@ class TicketCategorizer(BaseProcessor):
                 if successful_batches > 0
                 else 0
             )
-            categorize_phase_data = self.token_tracker["phase_breakdown"]["categorize"]
+            classify_phase_data = self.token_tracker["phase_breakdown"].get("classify", 
+                                                                                    self.token_tracker["phase_breakdown"]["categorize"])
 
-            print("\n📊 Estatísticas de Performance CATEGORIZE:")
+            print("\n📊 Estatísticas de Performance CLASSIFY:")
             print(
                 f"   • Batches processados: {successful_batches}/{len(ticket_batches)}"
             )
@@ -1019,19 +1038,19 @@ class TicketCategorizer(BaseProcessor):
                 f"   • Tempo total de processamento: {total_batch_processing_time:.2f}s"
             )
             print(
-                f"   • Tokens CATEGORIZE - Input: {categorize_phase_data['input']:,} | Output: {categorize_phase_data['output']:,}"
+                f"   • Tokens CLASSIFY - Input: {classify_phase_data['input']:,} | Output: {classify_phase_data['output']:,}"
             )
-            categorize_cost_formatted = self._format_cost_friendly(
-                categorize_phase_data["cost"]
+            classify_cost_formatted = self._format_cost_friendly(
+                classify_phase_data["cost"]
             )
-            print(f"   • Custo da fase CATEGORIZE: {categorize_cost_formatted}")
+            print(f"   • Custo da fase CLASSIFY: {classify_cost_formatted}")
 
             if not all_categorization_results:
-                print("\nAviso: Nenhuma categorização válida foi gerada!")
+                print("\nAviso: Nenhuma classificação válida foi gerada!")
                 return None
 
             print(
-                f"\nResultados obtidos: {len(all_categorization_results)} tickets categorizados"
+                f"\nResultados obtidos: {len(all_categorization_results)} tickets classificados"
             )
             print("Exemplo do primeiro resultado:", all_categorization_results[0])
 
@@ -1048,7 +1067,11 @@ class TicketCategorizer(BaseProcessor):
             results_df = pd.DataFrame(expanded_results)
             results_df = results_df.sort_values("ticket_id")
 
-            output_file = self.database_dir / "categorized_tickets.csv"
+            # Cria diretório de análises se não existir
+            analysis_dir = self.database_dir / "analysis_reports"
+            analysis_dir.mkdir(exist_ok=True)
+            
+            output_file = analysis_dir / "categorized_tickets.csv"
             results_df.to_csv(output_file, sep=";", index=False, encoding="utf-8-sig")
 
             print(f"\nResultados salvos em {output_file}")
@@ -1087,7 +1110,7 @@ class TicketCategorizer(BaseProcessor):
                 )
                 if phase == "map" and "chunks_processed" in data:
                     print(f"     └─ Chunks processados: {data['chunks_processed']}")
-                elif phase == "categorize" and "batches_processed" in data:
+                elif phase in ["classify", "categorize"] and "batches_processed" in data:
                     print(f"     └─ Batches processados: {data['batches_processed']}")
 
             # Métricas de performance
@@ -1113,10 +1136,10 @@ class TicketCategorizer(BaseProcessor):
                 for alert in comprehensive_report["budget_alerts"]:
                     print(f"   {alert}")
 
-            print("\n=== 🔄 Estatísticas de Error Handling ===")
-            print(f"Chunks processados com sucesso: {successful_chunks}/{len(docs)}")
+            print("\n=== 🔄 Estatísticas de Error Handling (Map→Reduce→Classify) ===")
+            print(f"Chunks resumidos com sucesso: {successful_chunks}/{len(docs)}")
             print(
-                f"Batches processados com sucesso: {successful_batches}/{len(ticket_batches)}"
+                f"Batches classificados com sucesso: {successful_batches}/{len(ticket_batches)}"
             )
             print(
                 f"Taxa de sucesso chunks: {(successful_chunks / len(docs) * 100):.1f}%"
@@ -1137,5 +1160,5 @@ class TicketCategorizer(BaseProcessor):
             return output_file
 
         except Exception as e:
-            print(f"Erro ao categorizar tickets: {str(e)}")
+            print(f"Erro ao classificar tickets: {str(e)}")
             return None

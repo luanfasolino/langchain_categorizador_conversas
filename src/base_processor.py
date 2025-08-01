@@ -1178,7 +1178,7 @@ class BaseProcessor:
             # Tenta recuperar do cache
             cached_result = self._get_from_cache(cache_key)
             if cached_result is not None:
-                print(f"Usando resultado em cache para chunk {doc_index}")
+                print(f"🎯 Cache HIT para chunk {doc_index}")
                 return cached_result
 
             try:

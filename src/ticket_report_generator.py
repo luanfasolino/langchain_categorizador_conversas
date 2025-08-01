@@ -61,12 +61,13 @@ class TicketReportGenerator(BaseProcessor):
         logger.info("Analyzing real categorization results from pipeline")
 
         # Auto-detect files if not provided
+        analysis_dir = self.database_dir / "analysis_reports"
         if not categorized_file:
-            categorized_file = self.database_dir / "categorized_tickets.csv"
+            categorized_file = analysis_dir / "categorized_tickets.csv"
         if not final_analysis_file:
-            final_analysis_file = self.database_dir / "final_analysis.csv"
+            final_analysis_file = analysis_dir / "final_analysis.csv"
         if not summarized_file:
-            summarized_file = self.database_dir / "summarized_tickets.csv"
+            summarized_file = analysis_dir / "summarized_tickets.csv"
 
         # Verify files exist
         available_files = {
@@ -833,7 +834,8 @@ class TicketReportGenerator(BaseProcessor):
 
             # Load categorized data for export
             if not categorized_file:
-                categorized_file = self.database_dir / "categorized_tickets.csv"
+                analysis_dir = self.database_dir / "analysis_reports"
+                categorized_file = analysis_dir / "categorized_tickets.csv"
 
             categorized_df = pd.read_csv(
                 categorized_file, sep=";", encoding="utf-8-sig"
